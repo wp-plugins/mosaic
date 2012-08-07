@@ -31,6 +31,23 @@ class Mosaic {
 	function admin_footer() {
 		include('template.php');
 	}
+
+	function get_attachment_json( $attachment ) {
+		$attachment = get_post( $attachment );
+
+		return array(
+			'id'       => $attachment->ID,
+			'title'    => esc_attr( $attachment->post_title ),
+			'filename' => esc_html( basename( $attachment->guid ) ),
+			'url'      => wp_get_attachment_url( $attachment->ID ),
+			'meta'     => wp_get_attachment_metadata( $attachment->ID ),
+		);
+	}
+
+	function get_attachments_json( $query_args = array() ) {
+		$query_args['post_type'] = 'attachment';
+		return array_map( array( $this, 'get_attachment_json' ), get_posts( $query_args ) );
+	}
 }
 
 new Mosaic;
