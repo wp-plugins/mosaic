@@ -18,7 +18,6 @@ class Mosaic {
 		wp_register_script( 'mosaic-underscore', plugins_url( 'js/underscore.js', __FILE__ ), array(), '1.3.3' );
 		wp_register_script( 'mosaic', plugins_url( 'js/mosaic.js', __FILE__ ), array('jquery','mosaic-underscore', 'jquery-ui-dialog') );
 
-
 		wp_register_style( 'mosaic', plugins_url( 'css/mosaic.css', __FILE__ ), array('wp-admin','wp-jquery-ui-dialog') );
 	}
 
@@ -45,7 +44,8 @@ class Mosaic {
 	}
 
 	function get_attachments_json( $query_args = array() ) {
-		$query_args['post_type'] = 'attachment';
+		$query_args['post_type']   = 'attachment';
+		$query_args['post_status'] = 'any';
 		return array_map( array( $this, 'get_attachment_json' ), get_posts( $query_args ) );
 	}
 }
