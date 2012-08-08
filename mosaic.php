@@ -57,11 +57,19 @@ class Mosaic {
 		$attachment = get_post( $attachment );
 
 		return array(
-			'id'       => $attachment->ID,
-			'title'    => esc_attr( $attachment->post_title ),
-			'filename' => esc_html( basename( $attachment->guid ) ),
-			'url'      => wp_get_attachment_url( $attachment->ID ),
-			'meta'     => wp_get_attachment_metadata( $attachment->ID ),
+			'id'          => $attachment->ID,
+			'title'       => esc_attr( $attachment->post_title ),
+			'filename'    => esc_html( basename( $attachment->guid ) ),
+			'url'         => wp_get_attachment_url( $attachment->ID ),
+			'meta'        => wp_get_attachment_metadata( $attachment->ID ),
+			'alt'         => get_post_meta( $attachment->ID, '_wp_attachment_image_alt', true ),
+			'author'      => $attachment->post_author,
+			'description' => $attachment->post_content,
+			'caption'     => $attachment->post_excerpt,
+			'slug'        => $attachment->post_name,
+			'status'      => $attachment->post_status,
+			'uploadedTo'  => $attachment->post_parent,
+			'mime'        => $attachment->post_mime_type,
 		);
 	}
 
