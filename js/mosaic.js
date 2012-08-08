@@ -24,12 +24,13 @@ if ( typeof wp === 'undefined' )
 	};
 
 	media.Attachment.prototype.fetch = function() {
+		var self = this;
 		return $.post( ajaxurl, {
 			action:   'get_attachment',
 			id:       this.id,
 			dataType: 'json'
 		}).done( function( data ) {
-			this.data = data;
+			self.data = data;
 		});
 	};
 

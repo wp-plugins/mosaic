@@ -33,12 +33,24 @@ class Mosaic {
 		include('template.php');
 	}
 
+	/**
+	 * Used to send JSON ajax responses.
+	 *
+	 * Sets a JSON content-type header, encodes and prints a json object, then dies.
+	 *
+	 * @param  mixed $json The object to be encoded and printed.
+	 */
+	function json_die( $json ) {
+		@header( 'Content-Type: application/json; charset=' . get_option( 'blog_charset' ) );
+		echo json_encode( $json );
+		wp_die();
+	}
+
 	function ajax_get_attachment() {
 		if ( ! isset( $_REQUEST['id'] ) || ! current_user_can( 'read_post', $_REQUEST['id'] ) )
 			wp_die( -1 );
 
-		echo json_encode( $this->get_attachment_json( $_REQUEST['id'] ) );
-		wp_die();
+		$this->json_die( $this->get_attachment_json( $_REQUEST['id'] ) );
 	}
 
 	function get_attachment_json( $attachment ) {
