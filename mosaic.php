@@ -12,6 +12,8 @@ class Mosaic {
 	function __construct() {
 		add_action( 'load-post.php', array( $this, 'init' ) );
 		add_action( 'admin_init', array( $this, 'register_scripts' ) );
+
+		add_action( 'wp_ajax_get_attachment', array( $this, 'ajax_get_attachment' ) );
 	}
 
 	function register_scripts() {
@@ -29,6 +31,14 @@ class Mosaic {
 
 	function admin_footer() {
 		include('template.php');
+	}
+
+	function ajax_get_attachment() {
+		if ( ! isset( $_REQUEST['id'] ) || ! current_user_can( 'read_post', $_REQUEST['id'] ) )
+			wp_die( -1 );
+
+		echo json_encode( $this->get_attachment_json( $_REQUEST['id'] ) );
+		wp_die();
 	}
 
 	function get_attachment_json( $attachment ) {
