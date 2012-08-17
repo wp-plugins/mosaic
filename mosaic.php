@@ -13,7 +13,8 @@ class Mosaic {
 		add_action( 'load-post.php', array( $this, 'init' ) );
 		add_action( 'admin_init', array( $this, 'register_scripts' ) );
 
-		add_action( 'wp_ajax_get_attachment', array( $this, 'ajax_get_attachment' ) );
+		add_action( 'wp_ajax_get_attachment',  array( $this, 'ajax_get_attachment' ) );
+		add_action( 'wp_ajax_get_attachments', array( $this, 'ajax_get_attachments' ) );
 	}
 
 	function register_scripts() {
@@ -46,15 +47,54 @@ class Mosaic {
 		wp_die();
 	}
 
-	function ajax_get_attachment() {
-		if ( ! isset( $_REQUEST['id'] ) || ! current_user_can( 'read_post', $_REQUEST['id'] ) )
-			wp_die( -1 );
+	function wp_die_success( $data = null ) {
+		$json = array( 'success' => true );
 
-		$this->wp_json_die( $this->get_attachment_json( $_REQUEST['id'] ) );
+		if ( isset( $data ) )
+			$json['data'] = $data;
+
+		$this->wp_json_die( $json );
+	}
+
+	function wp_die_error( $data = null ) {
+		$json =  array( 'success' => false );
+
+		if ( isset( $data ) )
+			$json['data'] = $data;
+
+		$this->wp_json_die( $json );
+	}
+
+	function ajax_get_attachment() {
+		if ( ! isset( $_REQUEST['id'] ) )
+			$this->wp_die_error();
+
+		$json = $this->get_attachment_json( absint( $_REQUEST['id'] ) );
+
+		if ( empty( $json ) )
+			$this->wp_die_error();
+
+		$this->wp_die_success( $json );
+	}
+
+	function ajax_get_attachments() {
+		$query = isset( $_REQUEST['query'] ) ? $_REQUEST['query'] : array();
+		$json  = $this->get_attachments_json( $query );
+
+		$this->wp_die_error();
+
+		$this->wp_die_success( $json );
 	}
 
 	function get_attachment_json( $attachment ) {
-		$attachment = get_post( $attachment );
+		if ( ! $attachment = get_post( $attachment ) )
+		   return;
+
+		if ( 'attachment' != $attachment->post_type )
+		   return;
+
+		if ( ! current_user_can( 'read_post', $attachment->ID ) )
+		   return;
 
 		return array(
 			'id'          => $attachment->ID,
