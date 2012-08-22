@@ -18,8 +18,7 @@ class Mosaic {
 	}
 
 	function register_scripts() {
-		wp_register_script( 'mosaic-underscore', plugins_url( 'js/underscore.js', __FILE__ ), array(), '1.3.3' );
-		wp_register_script( 'mosaic', plugins_url( 'js/mosaic.js', __FILE__ ), array('jquery','mosaic-underscore', 'jquery-ui-dialog') );
+		wp_register_script( 'mosaic', plugins_url( 'js/mosaic.js', __FILE__ ), array('backbone','jquery','jquery-ui-dialog') );
 
 		wp_register_style( 'mosaic', plugins_url( 'css/mosaic.css', __FILE__ ), array('wp-admin','wp-jquery-ui-dialog') );
 	}
