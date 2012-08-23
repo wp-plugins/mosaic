@@ -6,17 +6,53 @@ if ( typeof wp === 'undefined' )
 		Attachment, Attachments;
 
 	/**
-	 * AJAX
+	 * ========================================================================
+	 * UTILITIES
+	 * ========================================================================
 	 */
+
 	_.extend( media, {
-		// post( [action], [data] );
+		/**
+		 * media.template( id )
+		 *
+		 * Fetches a template by id.
+		 *
+		 * @param  {string} id   A string that corresponds to a DOM element with an id prefixed with "tmpl-".
+		 *                       For example, "attachment" maps to "tmpl-attachment".
+		 * @return {function}    A function that lazily-compiles the template requested.
+		 */
+		template: _.memoize( function( id ) {
+			var compiled;
+			return function( data ) {
+				compiled = compiled || _.template( $( '#tmpl-' + id ).html() );
+				return compiled( data );
+			};
+		}),
+
+		/**
+		 * media.post( [action], [data] )
+		 *
+		 * Sends a POST request to WordPress.
+		 *
+		 * @param  {string} action The slug of the action to fire in WordPress.
+		 * @param  {object} data   The data to populate $_POST with.
+		 * @return {$.promise}     A jQuery promise that represents the request.
+		 */
 		post: function( action, data ) {
 			return media.ajax({
 				data: _.isObject( action ) ? action : _.extend( data || {}, { action: action })
 			});
 		},
 
-		// ajax( [action], [options] );
+		/**
+		 * media.ajax( [action], [options] )
+		 *
+		 * Sends a POST request to WordPress.
+		 *
+		 * @param  {string} action  The slug of the action to fire in WordPress.
+		 * @param  {object} options The options passed to jQuery.ajax.
+		 * @return {$.promise}      A jQuery promise that represents the request.
+		 */
 		ajax: function( action, options ) {
 			if ( _.isObject( action ) ) {
 				options = action;
@@ -54,8 +90,15 @@ if ( typeof wp === 'undefined' )
 		}
 	});
 
+
 	/**
-	 * ATTACHMENT
+	 * ========================================================================
+	 * MODELS
+	 * ========================================================================
+	 */
+
+	/**
+	 * wp.media.Attachment
 	 */
 	media.attachment = _.memoize( function( id ) {
 		return new Attachment({ id: id });
@@ -81,7 +124,7 @@ if ( typeof wp === 'undefined' )
 	});
 
 	/**
-	 * ATTACHMENTS
+	 * wp.media.Attachments
 	 */
 	media.query = function( query, options ) {
 		return new Attachments().query( query, options );
@@ -118,19 +161,85 @@ if ( typeof wp === 'undefined' )
 		}
 	});
 
+
+	/**
+	 * ========================================================================
+	 * VIEWS
+	 * ========================================================================
+	 */
+
+	/**
+	 * wp.media.AttachmentsView
+	 */
+	media.AttachmentsView = Backbone.View.extend({
+		tagName:   'div',
+		className: 'attachments',
+		template:  media.template('attachments'),
+
+		initialize: function() {
+			this.collection.on( 'add', this.addOne, this );
+			this.collection.on( 'reset', this.addAll, this );
+			this.collection.on( 'all', this.render, this );
+
+			this.$list = $('<ul />');
+		},
+		render: function() {
+			this.$el.html( this.template( this.options ) ).append( this.$list );
+			return this;
+		},
+		addOne: function( attachment ) {
+			// console.log('addOne', arguments );
+			var view = new media.AttachmentView({
+				model: attachment
+			}).render();
+
+			this.$list.append( view.$el );
+		},
+		addAll: function() {
+			this.collection.each( this.addOne, this );
+		}
+	});
+
+
+	/**
+	 * wp.media.AttachmentView
+	 */
+	media.AttachmentView = Backbone.View.extend({
+		tagName:   'li',
+		className: 'attachment',
+		template:  media.template('attachment'),
+		render:    function() {
+			this.$el.html( this.template( this.model.toJSON() ) );
+			return this;
+		}
+	});
+
 	$(function() {
-		var trigger = $('<span class="button-secondary">Mosaic</span>');
+		var trigger = $('<span class="button-secondary">Mosaic</span>'),
+			modal = $('<div/>'), library, view;
+
 		$('#wp-content-media-buttons').prepend( trigger );
 
 		trigger.on( 'click.mosaic', function() {
-			$('#mosaic').dialog({
+			modal.dialog({
 				title: 'Insert Media',
 				width: 480,
 				height: 'auto',
 				modal: true,
 				dialogClass: 'wp-dialog',
-				zIndex: 300000
+				zIndex: 300000,
+				autoOpen: true
 			});
 		});
+
+		library = new media.Attachments();
+		view = new media.AttachmentsView({
+			directions: 'Select stuff.',
+			collection: library
+		});
+
+		view.$el.appendTo( modal );
+
+		library.fetch();
 	});
 }(jQuery));
