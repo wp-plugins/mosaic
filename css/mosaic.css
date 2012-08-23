@@ -1,3 +1,61 @@
+/**
+ * Modal
+ */
+.media-modal {
+	position: fixed;
+	top: 5%;
+	left: 5%;
+	right: 5%;
+	bottom: 5%;
+	background: #fff;
+	z-index: 125000;
+}
+
+.media-modal-backdrop {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: #000;
+	opacity: 0.8;
+	z-index: 120000;
+}
+
+.media-modal-header {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 28px;
+	background: #f1f1f1;
+}
+
+.media-modal-header h3 {
+	float: left;
+	padding: 0 0 0 10px;
+	margin: 0;
+	line-height: 28px;
+}
+
+.media-modal-close {
+	float: right;
+	padding-right: 10px;
+	line-height: 28px;
+}
+
+.media-modal-content {
+	position: absolute;
+	top: 28px;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	overflow: auto;
+}
+
+/**
+ * Attachments
+ */
 .attachment img {
 	width: 300px;
 	height: 200px;

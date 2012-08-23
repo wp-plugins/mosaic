@@ -170,7 +170,46 @@ if ( typeof wp === 'undefined' )
 	 */
 
 	/**
-	 * wp.media.AttachmentsView
+	 * wp.media.view.Modal
+	 */
+	view.Modal = Backbone.View.extend({
+		tagName:  'div',
+		template: media.template('media-modal'),
+
+		events: {
+			'click .media-modal-backdrop, .media-modal-close' : 'close'
+		},
+
+		render: function() {
+			this.$el.html( this.template( this.options ) );
+			this.$('.media-modal-content').append( this.options.$content );
+			return this;
+		},
+
+		open: function( event ) {
+			this.$el.show();
+			event.preventDefault();
+		},
+
+		close: function( event ) {
+			this.$el.hide();
+			event.preventDefault();
+		},
+
+		content: function( $content ) {
+			this.options.$content = $content;
+			return this.render();
+		},
+
+		title: function( title ) {
+			this.options.title = title;
+			return this.render();
+		}
+	});
+
+
+	/**
+	 * wp.media.view.Attachments
 	 */
 	view.Attachments = Backbone.View.extend({
 		tagName:   'div',
@@ -202,7 +241,7 @@ if ( typeof wp === 'undefined' )
 
 
 	/**
-	 * wp.media.AttachmentView
+	 * wp.media.view.Attachment
 	 */
 	view.Attachment = Backbone.View.extend({
 		tagName:   'li',
@@ -216,29 +255,24 @@ if ( typeof wp === 'undefined' )
 
 	$(function() {
 		var trigger = $('<span class="button-secondary">Mosaic</span>'),
-			modal = $('<div/>'), library;
+			modal, library;
 
 		$('#wp-content-media-buttons').prepend( trigger );
 
 		trigger.on( 'click.mosaic', function() {
-			modal.dialog({
-				title: 'Insert Media',
-				width: 480,
-				height: 'auto',
-				modal: true,
-				dialogClass: 'wp-dialog',
-				zIndex: 300000,
-				autoOpen: true
+			library = new Attachments();
+			modal = new view.Modal({
+				title: 'Testing'
 			});
+
+			modal.$el.appendTo('body');
+
+			modal.content( new view.Attachments({
+				directions: 'Select stuff.',
+				collection: library
+			}).$el );
+
+			library.fetch();
 		});
-
-		library = new Attachments();
-
-		new view.Attachments({
-			directions: 'Select stuff.',
-			collection: library
-		}).$el.appendTo( modal );
-
-		library.fetch();
 	});
 }(jQuery));

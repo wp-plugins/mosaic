@@ -1,3 +1,14 @@
+<script type="text/html" id="tmpl-media-modal">
+	<div class="media-modal">
+		<div class="media-modal-header">
+			<h3><%- title %></h3>
+			<a class="media-modal-close" href="" title="<?php esc_attr_e('Close'); ?>"><?php echo 'Close'; ?></a>
+		</div>
+		<div class="media-modal-content"></div>
+	</div>
+	<div class="media-modal-backdrop"></div>
+</script>
+
 <script type="text/html" id="tmpl-media-workspace">
 	<div class="upload-attachments">
 		<% if ( selectOne ) { %>
