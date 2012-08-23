@@ -80,8 +80,6 @@ class Mosaic {
 		$query = isset( $_REQUEST['query'] ) ? $_REQUEST['query'] : array();
 		$json  = $this->get_attachments_json( $query );
 
-		$this->wp_die_error();
-
 		$this->wp_die_success( $json );
 	}
 

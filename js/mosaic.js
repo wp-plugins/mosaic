@@ -2,7 +2,8 @@ if ( typeof wp === 'undefined' )
 	var wp = {};
 
 (function($){
-	var media = wp.media = {};
+	var media = wp.media = {},
+		Attachment, Attachments;
 
 	/**
 	 * AJAX
@@ -57,20 +58,20 @@ if ( typeof wp === 'undefined' )
 	 * ATTACHMENT
 	 */
 	media.attachment = _.memoize( function( id ) {
-		return new wp.media.Attachment({ id: id });
+		return new Attachment({ id: id });
 	});
 
-	media.Attachment = Backbone.Model.extend({
+	Attachment = media.Attachment = Backbone.Model.extend({
 		sync: function( method, model, options ) {
 			// Overload the read method so Attachment.fetch() functions correctly.
 			if ( 'read' === method ) {
-				return media.ajax( _.extend( options || {}, {
-					context: this,
-					data: {
-						action: 'get_attachment',
-						id: 8
-					}
-				} ) );
+				options = options || {};
+				options.context = this;
+				options.data = _.extend( options.data || {}, {
+					action: 'get_attachment',
+					id: 8
+				});
+				return media.ajax( options );
 
 			// Otherwise, fall back to Backbone.sync()
 			} else {
@@ -80,28 +81,42 @@ if ( typeof wp === 'undefined' )
 	});
 
 	/**
-	 * QUERY
+	 * ATTACHMENTS
 	 */
-	media.query = function( options ) {
-		return new media.Query( options );
+	media.query = function( query, options ) {
+		return new Attachments().query( query, options );
 	};
 
-	media.Query = function( options ) {
-		var query = this,
-			promise;
+	Attachments = media.Attachments = Backbone.Collection.extend({
+		model: Attachment,
 
-		promise = media.ajax( 'get_attachments', {
-			query: options
-		}).done( function( data ) {
-			query.attachments = _.map( data, function( datum ) {
-				return media.attachment( datum.id ).parse( datum );
-			});
-		});
+		query: function( query, options ) {
+			options = options || {};
+			options.data = _.extend( options.data || {}, { query: query });
+			return this.fetch( options );
+		},
 
-		_.extend( this, promise );
+		sync: function( method, model, options ) {
+			// Overload the read method so Attachment.fetch() functions correctly.
+			if ( 'read' === method ) {
+				options = options || {};
+				options.context = this;
+				options.data = _.extend( options.data || {}, {
+					action: 'get_attachments'
+				});
+				options.data.query = _.defaults( options.data.query || {}, Attachments.defaultQueryArgs );
+				return media.ajax( options );
 
-		this.options = options;
-	};
+			// Otherwise, fall back to Backbone.sync()
+			} else {
+				return Backbone.sync.apply( this, arguments );
+			}
+		}
+	}, {
+		defaultQueryArgs: {
+			posts_per_page: 40
+		}
+	});
 
 	$(function() {
 		var trigger = $('<span class="button-secondary">Mosaic</span>');
