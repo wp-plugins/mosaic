@@ -2,7 +2,8 @@ if ( typeof wp === 'undefined' )
 	var wp = {};
 
 (function($){
-	var media = wp.media = {},
+	var media = wp.media = { view: {} },
+		view  = media.view,
 		Attachment, Attachments;
 
 	/**
@@ -171,7 +172,7 @@ if ( typeof wp === 'undefined' )
 	/**
 	 * wp.media.AttachmentsView
 	 */
-	media.AttachmentsView = Backbone.View.extend({
+	view.Attachments = Backbone.View.extend({
 		tagName:   'div',
 		className: 'attachments',
 		template:  media.template('attachments'),
@@ -188,8 +189,7 @@ if ( typeof wp === 'undefined' )
 			return this;
 		},
 		addOne: function( attachment ) {
-			// console.log('addOne', arguments );
-			var view = new media.AttachmentView({
+			var view = new media.view.Attachment({
 				model: attachment
 			}).render();
 
@@ -204,7 +204,7 @@ if ( typeof wp === 'undefined' )
 	/**
 	 * wp.media.AttachmentView
 	 */
-	media.AttachmentView = Backbone.View.extend({
+	view.Attachment = Backbone.View.extend({
 		tagName:   'li',
 		className: 'attachment',
 		template:  media.template('attachment'),
@@ -216,7 +216,7 @@ if ( typeof wp === 'undefined' )
 
 	$(function() {
 		var trigger = $('<span class="button-secondary">Mosaic</span>'),
-			modal = $('<div/>'), library, view;
+			modal = $('<div/>'), library;
 
 		$('#wp-content-media-buttons').prepend( trigger );
 
@@ -232,13 +232,12 @@ if ( typeof wp === 'undefined' )
 			});
 		});
 
-		library = new media.Attachments();
-		view = new media.AttachmentsView({
+		library = new Attachments();
+
+		new view.Attachments({
 			directions: 'Select stuff.',
 			collection: library
-		});
-
-		view.$el.appendTo( modal );
+		}).$el.appendTo( modal );
 
 		library.fetch();
 	});
