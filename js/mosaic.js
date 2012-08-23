@@ -2,20 +2,46 @@ if ( typeof wp === 'undefined' )
 	var wp = {};
 
 (function($){
-	var media = wp.media = {
+	var media = wp.media = {};
 
-		// ajax( [action], [query] );
-		ajax: function( action, query ) {
+	/**
+	 * AJAX
+	 */
+	_.extend( media, {
+		// post( [action], [data] );
+		post: function( action, data ) {
+			return media.ajax({
+				data: _.isObject( action ) ? action : _.extend( data || {}, { action: action })
+			});
+		},
+
+		// ajax( [action], [options] );
+		ajax: function( action, options ) {
 			if ( _.isObject( action ) ) {
-				query  = action;
-				action = null;
+				options = action;
+			} else {
+				options = options || {};
+				options.data = _.extend( options.data || {}, { action: action });
 			}
 
-			query = _.defaults( query || {}, { action: action });
+			options = _.defaults( options || {}, {
+				type:    'POST',
+				url:     ajaxurl,
+				context: this
+			});
 
 			return $.Deferred( function( deferred ) {
+				// Transfer success/error callbacks.
+				if ( options.success )
+					deferred.done( options.success );
+				if ( options.error )
+					deferred.fail( options.error );
+
+				delete options.success;
+				delete options.error;
+
 				// Use with PHP's wp_die_success() and wp_die_error()
-				$.post( ajaxurl, query ).done( function( response ) {
+				$.ajax( options ).done( function( response ) {
 					if ( _.isObject( response ) && ! _.isUndefined( response.success ) )
 						deferred[ response.success ? 'resolveWith' : 'rejectWith' ]( this, [response.data] );
 					else
@@ -24,50 +50,41 @@ if ( typeof wp === 'undefined' )
 					deferred.rejectWith( this, arguments );
 				});
 			}).promise();
-		},
-
-		attachment: _.memoize( function( id ) {
-			return new wp.media.Attachment( id );
-		}),
-
-		query: function( options ) {
-			return new media.Query( options );
 		}
-	};
+	});
 
 	/**
 	 * ATTACHMENT
 	 */
-	media.Attachment = function( id ) {
-		this.id = id;
-	};
+	media.attachment = _.memoize( function( id ) {
+		return new wp.media.Attachment({ id: id });
+	});
 
-	_.extend( media.Attachment.prototype, {
-		parse: function( data ) {
-			this.data = data;
-			return this;
-		},
-		fetch: function() {
-			var attachment = this;
+	media.Attachment = Backbone.Model.extend({
+		sync: function( method, model, options ) {
+			// Overload the read method so Attachment.fetch() functions correctly.
+			if ( 'read' === method ) {
+				return media.ajax( _.extend( options || {}, {
+					context: this,
+					data: {
+						action: 'get_attachment',
+						id: 8
+					}
+				} ) );
 
-			return media.ajax( 'get_attachment', {
-				id: this.id
-			}).done( function( data ) {
-				attachment.parse( data );
-			});
+			// Otherwise, fall back to Backbone.sync()
+			} else {
+				return Backbone.sync.apply( this, arguments );
+			}
 		}
 	});
 
 	/**
-	 * ATTACHMENTS
+	 * QUERY
 	 */
-	media.Attachments = function() {
+	media.query = function( options ) {
+		return new media.Query( options );
 	};
-
-	_.extend( media.Attachments.prototype, {
-		add: function() {
-		}
-	});
 
 	media.Query = function( options ) {
 		var query = this,
@@ -84,12 +101,6 @@ if ( typeof wp === 'undefined' )
 		_.extend( this, promise );
 
 		this.options = options;
-	};
-
-
-	media.view.Attachment = function( model ) {
-		this.model = model;
-		this.element = $('<div class="attachment" />');
 	};
 
 	$(function() {
