@@ -93,12 +93,16 @@ class Mosaic {
 		if ( ! current_user_can( 'read_post', $attachment->ID ) )
 		   return;
 
-		return array(
+		$meta = wp_get_attachment_metadata( $attachment->ID );
+		list( $type, $subtype ) = explode( '/', $attachment->post_mime_type );
+
+		$attachment_url = wp_get_attachment_url( $attachment->ID );
+
+		$json = array(
 			'id'          => $attachment->ID,
 			'title'       => esc_attr( $attachment->post_title ),
 			'filename'    => esc_html( basename( $attachment->guid ) ),
-			'url'         => wp_get_attachment_url( $attachment->ID ),
-			'meta'        => wp_get_attachment_metadata( $attachment->ID ),
+			'url'         => $attachment_url,
 			'alt'         => get_post_meta( $attachment->ID, '_wp_attachment_image_alt', true ),
 			'author'      => $attachment->post_author,
 			'description' => $attachment->post_content,
@@ -107,7 +111,32 @@ class Mosaic {
 			'status'      => $attachment->post_status,
 			'uploadedTo'  => $attachment->post_parent,
 			'mime'        => $attachment->post_mime_type,
+			'type'        => $type,
+			'subtype'     => $subtype,
 		);
+
+		if ( 'image' === $type ) {
+			$sizes = array();
+			$base_url = str_replace( wp_basename( $attachment_url ), '', $attachment_url );
+
+			foreach ( $meta['sizes'] as $slug => $size ) {
+				$sizes[ $slug ] = array(
+					'height'      => $size['height'],
+					'width'       => $size['width'],
+					'url'         => $base_url . $size['file'],
+					'orientation' => $size['height'] > $size['width'] ? 'portrait' : 'landscape',
+				);
+			}
+
+			$json = array_merge( $json, array(
+				'height'      => $meta['height'],
+				'width'       => $meta['width'],
+				'sizes'       => $sizes,
+				'orientation' => $meta['height'] > $meta['width'] ? 'portrait' : 'landscape',
+			) );
+		}
+
+		return apply_filters( 'get_attachment_json', $json, $attachment, $meta );
 	}
 
 	function get_attachments_json( $query_args = array() ) {

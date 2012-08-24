@@ -23,12 +23,16 @@
 </script>
 
 <script type="text/html" id="tmpl-attachments">
-	<h3><%- directions %></h3>
-	<input class="search" type="text" placeholder="<?php esc_attr_e('Search'); ?>" />
+	<div class="attachments-header">
+		<h3><%- directions %></h3>
+		<input class="search" type="text" placeholder="<?php esc_attr_e('Search'); ?>" />
+	</div>
 </script>
 
 <script type="text/html" id="tmpl-attachment">
-	<img src="<%- url %>" />
-	<div class="actions"></div>
+	<div class="attachment-thumbnail <%- sizes.medium.orientation %>">
+		<img src="<%- sizes.medium.url %>" />
+		<div class="actions"></div>
+	</div>
 	<div class="describe"></div>
 </script>

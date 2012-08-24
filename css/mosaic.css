@@ -56,7 +56,87 @@
 /**
  * Attachments
  */
-.attachment img {
-	width: 300px;
+
+.attachments-header {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 50px;
+	background: #fff;
+}
+
+.attachments-header h3 {
+	float: left;
+	margin: 0;
+	padding: 0 0 0 10px;
+	line-height: 50px;
+	font-size: 18px;
+	font-weight: 200;
+}
+.attachments-header input {
+	float: right;
+	margin-top: 10px;
+	margin-right: 10px;
+}
+
+.attachments ul {
+	position: absolute;
+	top: 40px;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	overflow: auto;
+}
+
+/**
+ * Attachment
+ */
+.attachment {
+	position: relative;
+	float: left;
+	width: 200px;
 	height: 200px;
+
+	padding: 0;
+	margin: 8px;
+}
+
+.attachment-thumbnail {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	overflow: hidden;
+}
+
+.attachment img {
+	display: block;
+
+	/* Vertically center the thumbnails. */
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	-webkit-transform: translate( -50%, -50% );
+	-moz-transform:    translate( -50%, -50% );
+	-ms-transform:     translate( -50%, -50% );
+	-o-transform:      translate( -50%, -50% );
+	transform:         translate( -50%, -50% );
+
+	margin: 0 auto;
+	box-shadow: inset 0 0 0 1px rgba( 0, 0, 0, 0.4 );
+}
+
+.attachment .portrait img {
+	width: 200px;
+}
+.attachment .landscape img {
+	height: 200px;
+}
+.attachment .attachment-thumbnail:hover img {
+	height: auto;
+	width: auto;
+	max-height: 200px;
+	max-width: 200px;
 }
