@@ -101,10 +101,6 @@ if ( typeof wp === 'undefined' )
 	/**
 	 * wp.media.Attachment
 	 */
-	media.attachment = _.memoize( function( id ) {
-		return new Attachment({ id: id });
-	});
-
 	Attachment = media.Attachment = Backbone.Model.extend({
 		sync: function( method, model, options ) {
 			// Overload the read method so Attachment.fetch() functions correctly.
@@ -122,22 +118,42 @@ if ( typeof wp === 'undefined' )
 				return Backbone.sync.apply( this, arguments );
 			}
 		}
+	}, {
+		get: _.memoize( function( id ) {
+			return new Attachment({ id: id });
+		})
 	});
 
 	/**
 	 * wp.media.Attachments
 	 */
 	media.query = function( query, options ) {
-		return new Attachments().query( query, options );
+		return new Attachments( null, { query: query }).fetch();
 	};
 
 	Attachments = media.Attachments = Backbone.Collection.extend({
 		model: Attachment,
 
-		query: function( query, options ) {
+		initialize: function( models, options ) {
 			options = options || {};
-			options.data = _.extend( options.data || {}, { query: query });
+
+			if ( options.query || _.isUndefined( options.query ) )
+				this.query = new Backbone.Model( _.defaults( options.query || {}, Attachments.defaultQueryArgs ) );
+		},
+
+		more: function( options ) {
+			options = options || {};
+			options.add = true;
+
+			this.query.set( 'paged', this.query.get('paged') + 1 );
+
 			return this.fetch( options );
+		},
+
+		parse: function( resp, xhr ) {
+			return _.map( resp, function( attrs ) {
+				return Attachment.get( attrs.id ).set( attrs );
+			});
 		},
 
 		sync: function( method, model, options ) {
@@ -148,7 +164,10 @@ if ( typeof wp === 'undefined' )
 				options.data = _.extend( options.data || {}, {
 					action: 'get_attachments'
 				});
-				options.data.query = _.defaults( options.data.query || {}, Attachments.defaultQueryArgs );
+
+				if ( this.query )
+					options.data.query = this.query.toJSON();
+
 				return media.ajax( options );
 
 			// Otherwise, fall back to Backbone.sync()
@@ -158,7 +177,8 @@ if ( typeof wp === 'undefined' )
 		}
 	}, {
 		defaultQueryArgs: {
-			posts_per_page: 40
+			posts_per_page: 40,
+			paged: 0
 		}
 	});
 
@@ -217,16 +237,27 @@ if ( typeof wp === 'undefined' )
 		template:  media.template('attachments'),
 
 		initialize: function() {
+			_.defaults( this.options, {
+				refreshSensitivity: 200,
+				refreshThreshold:   2
+			});
+
 			this.collection.on( 'add', this.addOne, this );
-			this.collection.on( 'reset', this.addAll, this );
-			this.collection.on( 'all', this.render, this );
+			this.collection.on( 'reset', this.render, this );
 
 			this.$list = $('<ul />');
+			this.list  = this.$list[0];
+
+			this.scroll = _.chain( this.scroll ).bind( this ).throttle( this.options.refreshSensitivity ).value();
+			this.$list.on( 'scroll.attachments', this.scroll );
 		},
+
 		render: function() {
+			this.collection.each( this.addOne, this );
 			this.$el.html( this.template( this.options ) ).append( this.$list );
 			return this;
 		},
+
 		addOne: function( attachment ) {
 			var view = new media.view.Attachment({
 				model: attachment
@@ -234,8 +265,13 @@ if ( typeof wp === 'undefined' )
 
 			this.$list.append( view.$el );
 		},
-		addAll: function() {
-			this.collection.each( this.addOne, this );
+
+		scroll: function( event ) {
+			if ( ! this.$list.is(':visible') )
+				return;
+
+			if ( this.list.scrollHeight < this.list.scrollTop + ( this.list.clientHeight * this.options.refreshThreshold ) )
+				this.collection.more();
 		}
 	});
 
