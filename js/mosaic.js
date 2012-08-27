@@ -227,6 +227,54 @@ if ( typeof wp === 'undefined' )
 		}
 	});
 
+	/**
+	 * wp.media.view.Workspace
+	 */
+	view.Workspace = Backbone.View.extend({
+		tagName:   'div',
+		className: 'media-workspace',
+		template:  media.template('media-workspace'),
+
+		events: {
+			'dragenter':  'maybeInitUploader',
+			'mouseenter': 'maybeInitUploader'
+		},
+
+		initialize: function() {
+			_.defaults( this.options, {
+				selectOne: false,
+				uploader:  {}
+			});
+
+			this.$content = $('<div class="existing-attachments" />');
+		},
+
+		render: function() {
+			var selection = this.collection;
+
+			this.$el.html( this.template( this.options ) ).append( this.$content );
+			return this;
+		},
+
+		maybeInitUploader: function() {
+			// If the uploader already exists or the body isn't in the DOM, bail.
+			if ( this.uploader || ! this.$el.closest('body').length )
+				return;
+
+			this.uploader = new wp.Uploader( _.extend({
+				container: this.$el,
+				dropzone:  this.$el,
+				browser:   this.$('.upload-attachments a'),
+				added:     function() {
+
+				},
+				success:   function() {
+
+				}
+			}, this.options.uploader ) );
+		}
+	});
+
 
 	/**
 	 * wp.media.view.Attachments
@@ -291,24 +339,33 @@ if ( typeof wp === 'undefined' )
 
 	$(function() {
 		var trigger = $('<span class="button-secondary">Mosaic</span>'),
-			modal, library;
+			models = {}, views = {};
 
 		$('#wp-content-media-buttons').prepend( trigger );
 
 		trigger.on( 'click.mosaic', function() {
-			library = new Attachments();
-			modal = new view.Modal({
+			models.library = new Attachments();
+			models.selection = new Attachments();
+
+			views.modal = new view.Modal({
 				title: 'Testing'
 			});
 
-			modal.$el.appendTo('body');
+			views.workspace = new view.Workspace({
+				collection: models.selection
+			});
 
-			modal.content( new view.Attachments({
+			views.attachments = new view.Attachments({
 				directions: 'Select stuff.',
-				collection: library
-			}).$el );
+				collection: models.library
+			});
 
-			library.fetch();
+			views.workspace.$content.append( views.attachments.$el );
+			views.workspace.render();
+			views.modal.content( views.workspace.$el );
+			views.modal.$el.appendTo('body');
+
+			models.library.fetch();
 		});
 	});
 }(jQuery));

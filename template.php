@@ -12,13 +12,14 @@
 <script type="text/html" id="tmpl-media-workspace">
 	<div class="upload-attachments">
 		<% if ( selectOne ) { %>
-			<?php _e( 'Drop a file here <span>or</span> <a href="#" class="button-secondary">Select a File</a>' ); ?>
+			<h3><?php _e( 'Drop a file here' ); ?></h3>
+			<span><?php _ex( 'or', 'Uploader: Drop a file here - or - Select a File' ); ?></span>
+			<a href="#" class="button-secondary"><?php _e( 'Select a File' ); ?></a>
 		<% } else { %>
-			<?php _e( 'Drop files here <span>or</span> <a href="#" class="button-secondary">Select Files</a>' ); ?>
+			<h3><?php _e( 'Drop files here' ); ?></h3>
+			<span><?php _ex( 'or', 'Uploader: Drop files here - or - Select Files' ); ?></span>
+			<a href="#" class="button-secondary"><?php _e( 'Select Files' ); ?></a>
 		<% } %>
-	</div>
-	<div class="existing-attachments">
-		<div class="media-workflow-actions"></div>
 	</div>
 </script>
 

@@ -18,14 +18,15 @@ class Mosaic {
 	}
 
 	function register_scripts() {
-		wp_register_script( 'mosaic', plugins_url( 'js/mosaic.js', __FILE__ ), array('backbone','jquery') );
-
+		wp_register_script( 'mosaic', plugins_url( 'js/mosaic.js', __FILE__ ), array('backbone','jquery','wp-plupload') );
 		wp_register_style( 'mosaic', plugins_url( 'css/mosaic.css', __FILE__ ), array('wp-admin') );
 	}
 
 	function init() {
 		wp_enqueue_script( 'mosaic' );
 		wp_enqueue_style( 'mosaic' );
+		wp_plupload_default_settings();
+
 		add_action( 'admin_footer', array( $this, 'admin_footer' ) );
 	}
 
