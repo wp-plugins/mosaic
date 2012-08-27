@@ -16,9 +16,9 @@
 		<% } else { %>
 			<?php _e( 'Drop files here <span>or</span> <a href="#" class="button-secondary">Select Files</a>' ); ?>
 		<% } %>
-	<div>
+	</div>
 	<div class="existing-attachments">
-		<div class="media-workflow-actions"><div>
+		<div class="media-workflow-actions"></div>
 	</div>
 </script>
 
