@@ -352,7 +352,7 @@ if ( typeof wp === 'undefined' )
 				},
 				progress: function( file ) {
 					file.attachment.set( _.pick( file, 'loaded', 'percent' ) );
-					// console.log('progress', arguments, file.attachment.toJSON() );
+					// console.log('progress', arguments, file.attachment.toJSON(), file.loaded, file.percent );
 				},
 				success: function( resp, file ) {
 					// console.log('success', arguments, file.attachment.toJSON() );
@@ -482,6 +482,7 @@ if ( typeof wp === 'undefined' )
 
 		initialize: function() {
 			this.model.on( 'change:sizes', this.render, this );
+			this.model.on( 'change:uploading', this.uploading, this );
 		},
 
 		render: function() {
@@ -493,10 +494,43 @@ if ( typeof wp === 'undefined' )
 
 			if ( sizes ) {
 				options.orientation = sizes.medium.orientation;
-				options.thumbnail = sizes.medium.url;
+				options.thumbnail   = sizes.medium.url;
 			}
 
 			this.$el.html( this.template( options ) );
+
+			if ( this.model.get('uploading') ) {
+				this.uploading();
+				this.$('.attachment-thumbnail').prepend( this.progressBar.$el );
+			}
+
+			return this;
+		},
+
+		uploading: function() {
+			if ( ! this.model.get('uploading') && this.progressBar )
+				return this.progressBar.remove();
+
+			if ( ! this.progressBar )
+				this.progressBar = new view.ProgressBar({ model: this.model }).render();
+		}
+	});
+
+	/**
+	 * wp.media.view.ProgressBar
+	 */
+	view.ProgressBar = Backbone.View.extend({
+		tagName: 'div',
+		className: 'media-progress-bar',
+
+		initialize: function() {
+			this.$bar = $('<div/>').appendTo( this.$el );
+			this.bar  = this.$bar[0];
+			this.model.on( 'change:percent', this.render, this );
+		},
+
+		render: function( loaded, size ) {
+			this.$bar.width( this.model.get('percent') + '%');
 			return this;
 		}
 	});
