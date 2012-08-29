@@ -3,10 +3,10 @@
  */
 .media-modal {
 	position: fixed;
-	top: 5%;
-	left: 5%;
-	right: 5%;
-	bottom: 5%;
+	top: 60px;
+	left: 60px;
+	right: 60px;
+	bottom: 60px;
 	background: #fff;
 	z-index: 125000;
 }
