@@ -195,12 +195,12 @@ if ( typeof wp === 'undefined' )
 				return;
 
 			this.watching = true;
-			Attachments.all.on( 'add', this.validatedAdd, this );
+			Attachments.all.on( 'add change', this.validatedAdd, this );
 		},
 
 		unwatch: function() {
 			this.watching = false;
-			Attachments.all.off( 'add', this.validatedAdd, this );
+			Attachments.all.off( 'add change', this.validatedAdd, this );
 		},
 
 		clone: function() {
@@ -447,14 +447,14 @@ if ( typeof wp === 'undefined' )
 
 			if ( collection.searching ) {
 				if ( ! collection.library )
-					collection.library = collection.toArray();
+					collection.library = collection.clone();
 
 				collection.query.set( 's', collection.searching );
-				collection.reset( _.filter( collection.library, collection.validate, collection ) );
+				collection.reset( _.filter( collection.library.models, collection.validate, collection ) );
 
 			} else {
 				collection.query.unset('s');
-				collection.reset( collection.library );
+				collection.reset( collection.library.models );
 				delete collection.library;
 			}
 		}
@@ -513,7 +513,7 @@ if ( typeof wp === 'undefined' )
 							var date;
 
 							if ( this.library && this.library.length )
-								date = _.last( this.library ).get('date');
+								date = this.library.last().get('date');
 							else if ( this.length )
 								date = this.last().get('date');
 
