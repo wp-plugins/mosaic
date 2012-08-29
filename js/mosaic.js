@@ -184,9 +184,11 @@ if ( typeof wp === 'undefined' )
 			}, this );
 		},
 
-		validatedAdd: function( attachment ) {
+		changed: function( attachment ) {
 			if ( this.validate( attachment ) )
 				this.add( attachment );
+			else
+				this.remove( attachment );
 			return this;
 		},
 
@@ -195,12 +197,12 @@ if ( typeof wp === 'undefined' )
 				return;
 
 			this.watching = true;
-			Attachments.all.on( 'add change', this.validatedAdd, this );
+			Attachments.all.on( 'add change', this.changed, this );
 		},
 
 		unwatch: function() {
 			this.watching = false;
-			Attachments.all.off( 'add change', this.validatedAdd, this );
+			Attachments.all.off( 'add change', this.changed, this );
 		},
 
 		clone: function() {
@@ -387,9 +389,12 @@ if ( typeof wp === 'undefined' )
 				refreshThreshold:   2
 			});
 
-			this.collection.on( 'add', function( attachment, attachments, options ) {
-				this.add( attachment, options.index );
+			_.each(['add','remove'], function( method ) {
+				this.collection.on( method, function( attachment, attachments, options ) {
+					this[ method ]( attachment, options.index );
+				}, this );
 			}, this );
+
 			this.collection.on( 'reset', this.refresh, this );
 
 			this.$list = $('<ul />');
@@ -426,6 +431,12 @@ if ( typeof wp === 'undefined' )
 				children.eq( index ).before( view.$el );
 			else
 				this.$list.append( view.$el );
+		},
+
+		remove: function( attachment, index ) {
+			var children = this.$list.children();
+			if ( children.length )
+				children.eq( index ).detach();
 		},
 
 		scroll: function( event ) {
