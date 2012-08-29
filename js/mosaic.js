@@ -109,7 +109,7 @@ if ( typeof wp === 'undefined' )
 				options.context = this;
 				options.data = _.extend( options.data || {}, {
 					action: 'get_attachment',
-					id: 8
+					id: this.id
 				});
 				return media.ajax( options );
 
@@ -117,10 +117,19 @@ if ( typeof wp === 'undefined' )
 			} else {
 				return Backbone.sync.apply( this, arguments );
 			}
+		},
+		parse: function( resp, xhr ) {
+			// Convert date strings into Date objects.
+			resp.date = new Date( resp.date );
+			resp.modified = new Date( resp.modified );
+			return resp;
 		}
 	}, {
-		get: _.memoize( function( id ) {
-			return new Attachment({ id: id });
+		create: function( attrs ) {
+			return Attachments.all.push( attrs );
+		},
+		get: _.memoize( function( id, attachment ) {
+			return Attachments.all.push( attachment || { id: id } );
 		})
 	});
 
@@ -137,26 +146,50 @@ if ( typeof wp === 'undefined' )
 		initialize: function( models, options ) {
 			options = options || {};
 
-			if ( options.query || _.isUndefined( options.query ) )
+			if ( options.query || _.isUndefined( options.query ) ) {
 				this.query = new Backbone.Model( _.defaults( options.query || {}, Attachments.defaultQueryArgs ) );
+
+				this.query.on( 'change', function() {
+					this.hasMore = true;
+				}, this );
+				this.hasMore = true;
+			}
 		},
 
 		more: function( options ) {
+			var collection = this;
+
+			if ( ! this.hasMore || ! this.query )
+				return;
+
 			options = options || {};
 			options.add = true;
 
-			this.query.set( 'paged', this.query.get('paged') + 1 );
+			return this.fetch( options ).done( function( resp ) {
+				if ( _.isEmpty( resp ) || resp.length < this.query.get( 'posts_per_page' ) )
+					collection.hasMore = false;
+			});
+		},
 
-			return this.fetch( options );
+		clone: function() {
+			var clone = new this.constructor( this.models, {
+				comparator: this.comparator,
+				query: this.query.toJSON()
+			});
+			clone.hasMore = this.hasMore;
+			return clone;
 		},
 
 		parse: function( resp, xhr ) {
 			return _.map( resp, function( attrs ) {
-				return Attachment.get( attrs.id ).set( attrs );
+				var attachment = Attachment.get( attrs.id );
+				return attachment.set( attachment.parse( attrs, xhr ) );
 			});
 		},
 
 		sync: function( method, model, options ) {
+			var query;
+
 			// Overload the read method so Attachment.fetch() functions correctly.
 			if ( 'read' === method ) {
 				options = options || {};
@@ -165,8 +198,15 @@ if ( typeof wp === 'undefined' )
 					action: 'get_attachments'
 				});
 
-				if ( this.query )
-					options.data.query = this.query.toJSON();
+				if ( this.query ) {
+					query = this.query.toJSON();
+
+					// Determine which page to query.
+					if ( _.isUndefined( query.paged ) )
+						query.paged = Math.floor( this.length / query.posts_per_page ) + 1;
+
+					options.data.query = query;
+				}
 
 				return media.ajax( options );
 
@@ -177,11 +217,11 @@ if ( typeof wp === 'undefined' )
 		}
 	}, {
 		defaultQueryArgs: {
-			posts_per_page: 40,
-			paged: 0
+			posts_per_page: 40
 		}
 	});
 
+	Attachments.all = new Attachments();
 
 	/**
 	 * ========================================================================
@@ -217,7 +257,7 @@ if ( typeof wp === 'undefined' )
 		},
 
 		content: function( $content ) {
-			this.options.$content = $content;
+			this.options.$content = ( $content instanceof Backbone.View ) ? $content.$el : $content;
 			return this.render();
 		},
 
@@ -265,11 +305,30 @@ if ( typeof wp === 'undefined' )
 				container: this.$el,
 				dropzone:  this.$el,
 				browser:   this.$('.upload-attachments a'),
-				added:     function() {
+				added: function( file ) {
+					file.attachment = Attachment.create( _.extend({
+						file: file,
+						uploading: true,
+						date: new Date()
+					}, _.pick( file, 'loaded', 'size', 'percent' ) ) );
 
+					// console.log('added', arguments, file.attachment.toJSON() );
 				},
-				success:   function() {
+				progress: function( file ) {
+					file.attachment.set( _.pick( file, 'loaded', 'percent' ) );
+					// console.log('progress', arguments, file.attachment.toJSON() );
+				},
+				success: function( resp, file ) {
+					// console.log('success', arguments, file.attachment.toJSON() );
+					_.each(['file','loaded','size','percent','uploading'], function( key ) {
+						file.attachment.unset( key );
+					});
 
+					file.attachment.set( 'id', resp.id );
+					Attachment.get( resp.id, file.attachment ).fetch();
+				},
+				error: function( message, error, file ) {
+					file.attachment.destroy();
 				}
 			}, this.options.uploader ) );
 		}
@@ -290,7 +349,9 @@ if ( typeof wp === 'undefined' )
 				refreshThreshold:   2
 			});
 
-			this.collection.on( 'add', this.addOne, this );
+			this.collection.on( 'add', function( attachment, attachments, options ) {
+				this.addOne( attachment, options.index );
+			}, this );
 			this.collection.on( 'reset', this.render, this );
 
 			this.$list = $('<ul />');
@@ -301,17 +362,25 @@ if ( typeof wp === 'undefined' )
 		},
 
 		render: function() {
+			this.$list.empty();
 			this.collection.each( this.addOne, this );
 			this.$el.html( this.template( this.options ) ).append( this.$list );
 			return this;
 		},
 
-		addOne: function( attachment ) {
-			var view = new media.view.Attachment({
+		addOne: function( attachment, index ) {
+			var view, children;
+
+			view = new media.view.Attachment({
 				model: attachment
 			}).render();
 
-			this.$list.append( view.$el );
+			children = this.$list.children();
+
+			if ( children.length > index )
+				children.eq( index ).before( view.$el );
+			else
+				this.$list.append( view.$el );
 		},
 
 		scroll: function( event ) {
@@ -331,8 +400,24 @@ if ( typeof wp === 'undefined' )
 		tagName:   'li',
 		className: 'attachment',
 		template:  media.template('attachment'),
-		render:    function() {
-			this.$el.html( this.template( this.model.toJSON() ) );
+
+		initialize: function() {
+			this.model.on( 'change:sizes', this.render, this );
+		},
+
+		render: function() {
+			var sizes = this.model.get('sizes'),
+				options = {
+					orientation: 'landscape',
+					thumbnail:   ''
+				};
+
+			if ( sizes ) {
+				options.orientation = sizes.medium.orientation;
+				options.thumbnail = sizes.medium.url;
+			}
+
+			this.$el.html( this.template( options ) );
 			return this;
 		}
 	});
@@ -341,18 +426,38 @@ if ( typeof wp === 'undefined' )
 		var trigger = $('<span class="button-secondary">Mosaic</span>'),
 			models = {}, views = {};
 
+		window.models = models;
+		window.views = views;
+
 		$('#wp-content-media-buttons').prepend( trigger );
 
 		trigger.on( 'click.mosaic', function() {
-			models.library = new Attachments();
-			models.selection = new Attachments();
+			var library = models.library = new Attachments( [], {
+				comparator: function( a, b ) {
+					a = a.get('date') || new Date();
+					b = b.get('date') || new Date();
+					return a == b ? 0 : (a > b ? -1 : 1);
+				}
+			});
+
+			library.until = new Date();
+			library.on( 'add remove', function() {
+				library.until = library.last().get('date') || library.until;
+			});
+
+			Attachments.all.on( 'add', function( attachment ) {
+				if ( attachment.get('date') > library.until )
+					library.add( attachment );
+			});
+
+			models.selected = new Attachments();
 
 			views.modal = new view.Modal({
 				title: 'Testing'
 			});
 
 			views.workspace = new view.Workspace({
-				collection: models.selection
+				collection: models.selected
 			});
 
 			views.attachments = new view.Attachments({
@@ -362,7 +467,7 @@ if ( typeof wp === 'undefined' )
 
 			views.workspace.$content.append( views.attachments.$el );
 			views.workspace.render();
-			views.modal.content( views.workspace.$el );
+			views.modal.content( views.workspace );
 			views.modal.$el.appendTo('body');
 
 			models.library.fetch();

@@ -111,6 +111,8 @@ class Mosaic {
 			'slug'        => $attachment->post_name,
 			'status'      => $attachment->post_status,
 			'uploadedTo'  => $attachment->post_parent,
+			'date'        => $attachment->post_date_gmt . ' UTC',
+			'modified'    => $attachment->post_modified_gmt . ' UTC',
 			'mime'        => $attachment->post_mime_type,
 			'type'        => $type,
 			'subtype'     => $subtype,

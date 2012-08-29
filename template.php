@@ -31,8 +31,10 @@
 </script>
 
 <script type="text/html" id="tmpl-attachment">
-	<div class="attachment-thumbnail <%- sizes.medium.orientation %>">
-		<img src="<%- sizes.medium.url %>" />
+	<div class="attachment-thumbnail <%- orientation %>">
+		<% if ( thumbnail ) { %>
+			<img src="<%- thumbnail %>" />
+		<% } %>
 		<div class="actions"></div>
 	</div>
 	<div class="describe"></div>
