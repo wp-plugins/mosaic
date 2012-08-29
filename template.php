@@ -20,6 +20,8 @@
 			<span><?php _ex( 'or', 'Uploader: Drop files here - or - Select Files' ); ?></span>
 			<a href="#" class="button-secondary"><?php _e( 'Select Files' ); ?></a>
 		<% } %>
+
+		<div class="media-progress-bar"><div></div></div>
 	</div>
 </script>
 
@@ -34,6 +36,10 @@
 	<div class="attachment-thumbnail <%- orientation %>">
 		<% if ( thumbnail ) { %>
 			<img src="<%- thumbnail %>" />
+		<% } %>
+
+		<% if ( uploading ) { %>
+			<div class="media-progress-bar"><div></div></div>
 		<% } %>
 		<div class="actions"></div>
 	</div>

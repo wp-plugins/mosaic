@@ -323,16 +323,35 @@ if ( typeof wp === 'undefined' )
 			});
 
 			this.$content = $('<div class="existing-attachments" />');
+
+			// Track uploading attachments.
+			this.pending = new Attachments( [], { query: false });
+			this.pending.on( 'add remove reset change:percent', function() {
+				this.$el.toggleClass( 'uploading', !! this.pending.length );
+
+				if ( ! this.$bar || ! this.pending.length )
+					return;
+
+				this.$bar.width( ( this.pending.reduce( function( memo, attachment ) {
+					if ( attachment.get('uploading') )
+						return memo + ( attachment.get('percent') || 0 );
+					else
+						return memo + 100;
+				}, 0 ) / this.pending.length ) + '%' );
+			}, this );
 		},
 
 		render: function() {
 			var selection = this.collection;
 
 			this.$el.html( this.template( this.options ) ).append( this.$content );
+			this.$bar = this.$('.media-progress-bar div');
 			return this;
 		},
 
 		maybeInitUploader: function() {
+			var workspace = this;
+
 			// If the uploader already exists or the body isn't in the DOM, bail.
 			if ( this.uploader || ! this.$el.closest('body').length )
 				return;
@@ -348,20 +367,27 @@ if ( typeof wp === 'undefined' )
 						date: new Date()
 					}, _.pick( file, 'loaded', 'size', 'percent' ) ) );
 
-					// console.log('added', arguments, file.attachment.toJSON() );
+					workspace.pending.add( file.attachment );
 				},
 				progress: function( file ) {
 					file.attachment.set( _.pick( file, 'loaded', 'percent' ) );
-					// console.log('progress', arguments, file.attachment.toJSON(), file.loaded, file.percent );
 				},
 				success: function( resp, file ) {
-					// console.log('success', arguments, file.attachment.toJSON() );
-					_.each(['file','loaded','size','percent','uploading'], function( key ) {
+					var complete;
+
+					_.each(['file','loaded','size','uploading','percent'], function( key ) {
 						file.attachment.unset( key );
 					});
 
 					file.attachment.set( 'id', resp.id );
 					Attachment.get( resp.id, file.attachment ).fetch();
+
+					complete = workspace.pending.all( function( attachment ) {
+						return ! attachment.get('uploading');
+					});
+
+					if ( complete )
+						workspace.pending.reset();
 				},
 				error: function( message, error, file ) {
 					file.attachment.destroy();
@@ -481,57 +507,36 @@ if ( typeof wp === 'undefined' )
 		template:  media.template('attachment'),
 
 		initialize: function() {
-			this.model.on( 'change:sizes', this.render, this );
-			this.model.on( 'change:uploading', this.uploading, this );
+			this.model.on( 'change:sizes change:uploading', this.render, this );
+			this.model.on( 'change:percent', this.progress, this );
 		},
 
 		render: function() {
-			var sizes = this.model.get('sizes'),
+			var attachment = this.model.toJSON(),
 				options = {
 					orientation: 'landscape',
-					thumbnail:   ''
+					thumbnail:   '',
+					uploading:   attachment.uploading
 				};
 
-			if ( sizes ) {
-				options.orientation = sizes.medium.orientation;
-				options.thumbnail   = sizes.medium.url;
+			if ( attachment.sizes ) {
+				options.orientation = attachment.sizes.medium.orientation;
+				options.thumbnail   = attachment.sizes.medium.url;
 			}
 
 			this.$el.html( this.template( options ) );
 
-			if ( this.model.get('uploading') ) {
-				this.uploading();
-				this.$('.attachment-thumbnail').prepend( this.progressBar.$el );
-			}
+			if ( attachment.uploading )
+				this.$bar = this.$('.media-progress-bar div');
+			else
+				delete this.$bar;
 
 			return this;
 		},
 
-		uploading: function() {
-			if ( ! this.model.get('uploading') && this.progressBar )
-				return this.progressBar.remove();
-
-			if ( ! this.progressBar )
-				this.progressBar = new view.ProgressBar({ model: this.model }).render();
-		}
-	});
-
-	/**
-	 * wp.media.view.ProgressBar
-	 */
-	view.ProgressBar = Backbone.View.extend({
-		tagName: 'div',
-		className: 'media-progress-bar',
-
-		initialize: function() {
-			this.$bar = $('<div/>').appendTo( this.$el );
-			this.bar  = this.$bar[0];
-			this.model.on( 'change:percent', this.render, this );
-		},
-
-		render: function( loaded, size ) {
-			this.$bar.width( this.model.get('percent') + '%');
-			return this;
+		progress: function() {
+			if ( this.$bar && this.$bar.length )
+				this.$bar.width( this.model.get('percent') + '%' );
 		}
 	});
 

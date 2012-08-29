@@ -261,3 +261,12 @@
 	width: 70%;
 	margin: -8px 0 0 -4px;
 }
+
+.upload-attachments .media-progress-bar {
+	margin-top: 80px;
+	display: none;
+}
+
+.uploading .upload-attachments .media-progress-bar {
+	display: block;
+}
