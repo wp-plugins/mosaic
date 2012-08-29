@@ -118,6 +118,7 @@ if ( typeof wp === 'undefined' )
 				return Backbone.sync.apply( this, arguments );
 			}
 		},
+
 		parse: function( resp, xhr ) {
 			// Convert date strings into Date objects.
 			resp.date = new Date( resp.date );
@@ -128,6 +129,7 @@ if ( typeof wp === 'undefined' )
 		create: function( attrs ) {
 			return Attachments.all.push( attrs );
 		},
+
 		get: _.memoize( function( id, attachment ) {
 			return Attachments.all.push( attachment || { id: id } );
 		})
@@ -146,6 +148,8 @@ if ( typeof wp === 'undefined' )
 		initialize: function( models, options ) {
 			options = options || {};
 
+			this.filters = options.filters || {};
+
 			if ( options.query || _.isUndefined( options.query ) ) {
 				this.query = new Backbone.Model( _.defaults( options.query || {}, Attachments.defaultQueryArgs ) );
 
@@ -154,6 +158,9 @@ if ( typeof wp === 'undefined' )
 				}, this );
 				this.hasMore = true;
 			}
+
+			if ( options.watch )
+				this.watch();
 		},
 
 		more: function( options ) {
@@ -171,10 +178,37 @@ if ( typeof wp === 'undefined' )
 			});
 		},
 
+		validate: function( attachment ) {
+			return _.all( this.filters, function( filter ) {
+				return !! filter.call( this, attachment );
+			}, this );
+		},
+
+		validatedAdd: function( attachment ) {
+			if ( this.validate( attachment ) )
+				this.add( attachment );
+			return this;
+		},
+
+		watch: function() {
+			if ( this.watching )
+				return;
+
+			this.watching = true;
+			Attachments.all.on( 'add', this.validatedAdd, this );
+		},
+
+		unwatch: function() {
+			this.watching = false;
+			Attachments.all.off( 'add', this.validatedAdd, this );
+		},
+
 		clone: function() {
 			var clone = new this.constructor( this.models, {
 				comparator: this.comparator,
-				query: this.query.toJSON()
+				query:      this.query.toJSON(),
+				filters:    this.filters,
+				watch:      this.watching
 			});
 			clone.hasMore = this.hasMore;
 			return clone;
@@ -343,6 +377,10 @@ if ( typeof wp === 'undefined' )
 		className: 'attachments',
 		template:  media.template('attachments'),
 
+		events: {
+			'keyup input': 'search'
+		},
+
 		initialize: function() {
 			_.defaults( this.options, {
 				refreshSensitivity: 200,
@@ -350,9 +388,9 @@ if ( typeof wp === 'undefined' )
 			});
 
 			this.collection.on( 'add', function( attachment, attachments, options ) {
-				this.addOne( attachment, options.index );
+				this.add( attachment, options.index );
 			}, this );
-			this.collection.on( 'reset', this.render, this );
+			this.collection.on( 'reset', this.refresh, this );
 
 			this.$list = $('<ul />');
 			this.list  = this.$list[0];
@@ -362,13 +400,20 @@ if ( typeof wp === 'undefined' )
 		},
 
 		render: function() {
-			this.$list.empty();
-			this.collection.each( this.addOne, this );
-			this.$el.html( this.template( this.options ) ).append( this.$list );
+			this.$el.html( this.template( this.options ) );
+			this.refresh();
 			return this;
 		},
 
-		addOne: function( attachment, index ) {
+		refresh: function() {
+			this.$list.detach().empty();
+			this.collection.each( this.add, this );
+			this.$el.append( this.$list );
+			this.scroll();
+			return this;
+		},
+
+		add: function( attachment, index ) {
 			var view, children;
 
 			view = new media.view.Attachment({
@@ -384,11 +429,34 @@ if ( typeof wp === 'undefined' )
 		},
 
 		scroll: function( event ) {
+			// @todo: is this still necessary?
 			if ( ! this.$list.is(':visible') )
 				return;
 
 			if ( this.list.scrollHeight < this.list.scrollTop + ( this.list.clientHeight * this.options.refreshThreshold ) )
 				this.collection.more();
+		},
+
+		search: function( event ) {
+			var collection = this.collection;
+
+			if ( collection.searching === event.target.value )
+				return;
+
+			collection.searching = event.target.value;
+
+			if ( collection.searching ) {
+				if ( ! collection.library )
+					collection.library = collection.toArray();
+
+				collection.query.set( 's', collection.searching );
+				collection.reset( _.filter( collection.library, collection.validate, collection ) );
+
+			} else {
+				collection.query.unset('s');
+				collection.reset( collection.library );
+				delete collection.library;
+			}
 		}
 	});
 
@@ -437,17 +505,35 @@ if ( typeof wp === 'undefined' )
 					a = a.get('date') || new Date();
 					b = b.get('date') || new Date();
 					return a == b ? 0 : (a > b ? -1 : 1);
-				}
-			});
+				},
 
-			library.until = new Date();
-			library.on( 'add remove', function() {
-				library.until = library.last().get('date') || library.until;
-			});
+				filters: {
+					date: (function( created ) {
+						return function( attachment ) {
+							var date;
 
-			Attachments.all.on( 'add', function( attachment ) {
-				if ( attachment.get('date') > library.until )
-					library.add( attachment );
+							if ( this.library && this.library.length )
+								date = _.last( this.library ).get('date');
+							else if ( this.length )
+								date = this.last().get('date');
+
+							date = date || created;
+							return attachment.get('date') >= date;
+						};
+					}( new Date() )),
+
+					search: function( attachment ) {
+						if ( ! this.searching )
+							return true;
+
+						return _.any(['title','filename','description','caption','slug'], function( key ) {
+							var value = attachment.get( key );
+							return value && -1 !== value.search( this.searching );
+						}, this );
+					}
+				},
+
+				watch: true
 			});
 
 			models.selected = new Attachments();
@@ -467,6 +553,7 @@ if ( typeof wp === 'undefined' )
 
 			views.workspace.$content.append( views.attachments.$el );
 			views.workspace.render();
+			views.attachments.render();
 			views.modal.content( views.workspace );
 			views.modal.$el.appendTo('body');
 
