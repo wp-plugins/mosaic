@@ -414,32 +414,61 @@ if ( typeof wp === 'undefined' )
 	 * CONTROLLERS
 	 * ========================================================================
 	 */
+
+	/**
+	 * wp.media.controller.Workflow
+	 */
 	media.controller.Workflow = Backbone.Model.extend({
 		defaults: {
 			multiple: true
 		},
 
 		initialize: function() {
+			this.createSelection();
+
+			// Initialize views.
+			this.modal     = new view.Modal({ controller: this });
+			this.workspace = new view.Workspace({ controller: this });
+		},
+
+		createSelection: function() {
+			var controller = this;
+
+			// Initialize workflow-specific models.
 			this.selection = new Attachments();
-			this.modal     = new view.Modal();
-			this.workspace = new view.Workspace().render();
+
+			// Override the selection's add method.
+			// If the workflow does not support multiple
+			// selected attachments, reset the selection.
+			this.selection.add = function( models, options ) {
+				if ( controller.get('multiple') ) {
+					return Attachments.prototype.add.apply( this, arguments );
+				} else {
+					models = _.isArray( models ) ? _.first( models ) : models;
+					return this.reset.call( this, [models], options );
+				}
+			};
+
+			// Override the selection's reset method.
+			// Always direct items through add and remove,
+			// as we need them to fire.
+			this.selection.reset = function( models, options ) {
+				return this.remove( models, options ).add( models, options );
+			};
+
+			// Create selection.has, which determines if a model
+			// exists in the collection based on cid and id,
+			// instead of direct comparison.
+			this.selection.has = function( attachment ) {
+				return !! ( this.getByCid( attachment.cid ) || this.get( attachment.id ) );
+			};
 		},
 
 		render: function() {
+			this.workspace.render();
 			this.modal.content( this.workspace );
 			this.modal.$el.appendTo('body');
 			return this;
-		},
-
-		select: function( attachment ) {
-			if ( this.get('multiple') )
-				this.selection.add( attachment );
-			else
-				this.selection.reset( attachment );
-		},
-
-		deselect: function( attachment ) {
-			this.selection.remove( attachment );
 		}
 	});
 
@@ -461,6 +490,8 @@ if ( typeof wp === 'undefined' )
 		},
 
 		initialize: function() {
+			this.controller = this.options.controller;
+
 			_.defaults( this.options, {
 				title: ''
 			});
@@ -507,12 +538,15 @@ if ( typeof wp === 'undefined' )
 		},
 
 		initialize: function() {
+			this.controller = this.options.controller;
+
 			_.defaults( this.options, {
 				selectOne: false,
 				uploader:  {}
 			});
 
 			this.attachmentsView = new view.Attachments({
+				controller: this.controller,
 				directions: 'Select stuff.',
 				collection: new Attachments( [], {
 					mirror: media.query()
@@ -610,6 +644,8 @@ if ( typeof wp === 'undefined' )
 		},
 
 		initialize: function() {
+			this.controller = this.options.controller;
+
 			_.defaults( this.options, {
 				refreshSensitivity: 200,
 				refreshThreshold:   2
@@ -648,7 +684,8 @@ if ( typeof wp === 'undefined' )
 			// the list in a single DOM operation.
 			this.$list.html( this.collection.map( function( attachment ) {
 				return new media.view.Attachment({
-					model: attachment
+					controller: this.controller,
+					model:      attachment
 				}).render().$el;
 			}) );
 
@@ -662,7 +699,8 @@ if ( typeof wp === 'undefined' )
 			var view, children;
 
 			view = new media.view.Attachment({
-				model: attachment
+				controller: this.controller,
+				model:      attachment
 			}).render();
 
 			children = this.$list.children();
@@ -714,9 +752,17 @@ if ( typeof wp === 'undefined' )
 		className: 'attachment',
 		template:  media.template('attachment'),
 
+		events: {
+			'click': 'toggleSelection'
+		},
+
 		initialize: function() {
+			this.controller = this.options.controller;
+
 			this.model.on( 'change:sizes change:uploading', this.render, this );
 			this.model.on( 'change:percent', this.progress, this );
+			this.model.on( 'add', this.select, this );
+			this.model.on( 'remove', this.deselect, this );
 		},
 
 		render: function() {
@@ -727,9 +773,10 @@ if ( typeof wp === 'undefined' )
 					uploading:   attachment.uploading
 				};
 
+			// Use the medium size if possible. If the medium size
+			// doesn't exist, then the attachment is too small.
+			// In that case, use the attachment itself.
 			if ( attachment.sizes && attachment.sizes.medium ) {
-				// Use the medium size if possible. If the medium size doesn't exist,
-				// then the attachment is too small. In that case, use the attachment itself.
 				options.orientation = attachment.sizes.medium.orientation;
 				options.thumbnail   = attachment.sizes.medium.url;
 			}
@@ -747,6 +794,21 @@ if ( typeof wp === 'undefined' )
 		progress: function() {
 			if ( this.$bar && this.$bar.length )
 				this.$bar.width( this.model.get('percent') + '%' );
+		},
+
+		toggleSelection: function( event ) {
+			var selection = this.controller.selection;
+			selection[ selection.has( this.model ) ? 'remove' : 'add' ]( this.model );
+		},
+
+		select: function( model, collection ) {
+			if ( collection === this.controller.selection )
+				this.$el.addClass('selected');
+		},
+
+		deselect: function( model, collection ) {
+			if ( collection === this.controller.selection )
+				this.$el.removeClass('selected');
 		}
 	});
 
