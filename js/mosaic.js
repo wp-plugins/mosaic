@@ -421,19 +421,14 @@ if ( typeof wp === 'undefined' )
 
 		initialize: function() {
 			this.selection = new Attachments();
-
-			views.workspace.$content.append( views.attachments.$el );
-			views.workspace.render();
-			views.attachments.render();
-			views.modal.content( views.workspace );
-			views.modal.$el.appendTo('body');
-
-			models.library.fetch();
+			this.modal     = new view.Modal();
+			this.workspace = new view.Workspace().render();
 		},
 
-		initViews: function() {
-			this.modal     = new view.Modal();
-			this.workspace = new view.Workspace();
+		render: function() {
+			this.modal.content( this.workspace );
+			this.modal.$el.appendTo('body');
+			return this;
 		},
 
 		select: function( attachment ) {
@@ -517,10 +512,15 @@ if ( typeof wp === 'undefined' )
 				uploader:  {}
 			});
 
-			this.$content = $('<div class="existing-attachments" />');
+			this.attachmentsView = new view.Attachments({
+				directions: 'Select stuff.',
+				collection: new Attachments( [], {
+					mirror: media.query()
+				})
+			}).render();
 
-			// Track selection.
-			this.selection = new Attachments();
+			this.$content = $('<div class="existing-attachments" />');
+			this.$content.append( this.attachmentsView.$el );
 
 			// Track uploading attachments.
 			this.pending = new Attachments( [], { query: false });
@@ -540,8 +540,6 @@ if ( typeof wp === 'undefined' )
 		},
 
 		render: function() {
-			var selection = this.collection;
-
 			this.$el.html( this.template( this.options ) ).append( this.$content );
 			this.$bar = this.$('.media-progress-bar div');
 			return this;
@@ -639,11 +637,23 @@ if ( typeof wp === 'undefined' )
 		},
 
 		refresh: function() {
+			// If there are no elements, load some.
+			if ( ! this.collection.length ) {
+				this.collection.more();
+				this.$list.empty();
+				return this;
+			}
+
+			// Otherwise, create all of the Attachment views, and replace
+			// the list in a single DOM operation.
 			this.$list.html( this.collection.map( function( attachment ) {
 				return new media.view.Attachment({
 					model: attachment
 				}).render().$el;
 			}) );
+
+			// Then, trigger the scroll event to check if we're within the
+			// threshold to query for additional attachments.
 			this.scroll();
 			return this;
 		},
@@ -674,8 +684,9 @@ if ( typeof wp === 'undefined' )
 			if ( ! this.$list.is(':visible') )
 				return;
 
-			if ( this.list.scrollHeight < this.list.scrollTop + ( this.list.clientHeight * this.options.refreshThreshold ) )
+			if ( this.list.scrollHeight < this.list.scrollTop + ( this.list.clientHeight * this.options.refreshThreshold ) ) {
 				this.collection.more();
+			}
 		},
 
 		search: function( event ) {
@@ -749,30 +760,7 @@ if ( typeof wp === 'undefined' )
 		$('#wp-content-media-buttons').prepend( trigger );
 
 		trigger.on( 'click.mosaic', function() {
-			var library = models.library = new Attachments( [], {
-				mirror: media.query()
-			});
-
-			views.modal = new view.Modal({
-				title: 'Testing'
-			});
-
-			views.workspace = new view.Workspace({
-				collection: models.selected
-			});
-
-			views.attachments = new view.Attachments({
-				directions: 'Select stuff.',
-				collection: models.library
-			});
-
-			views.workspace.$content.append( views.attachments.$el );
-			views.workspace.render();
-			views.attachments.render();
-			views.modal.content( views.workspace );
-			views.modal.$el.appendTo('body');
-
-			models.library.more();
+			new media.controller.Workflow().render();
 		});
 	});
 }(jQuery));
