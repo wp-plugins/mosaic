@@ -108,7 +108,7 @@ class Mosaic {
 			'author'      => $attachment->post_author,
 			'description' => $attachment->post_content,
 			'caption'     => $attachment->post_excerpt,
-			'slug'        => $attachment->post_name,
+			'name'        => $attachment->post_name,
 			'status'      => $attachment->post_status,
 			'uploadedTo'  => $attachment->post_parent,
 			'date'        => $attachment->post_date_gmt . ' UTC',

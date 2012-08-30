@@ -278,7 +278,6 @@ if ( typeof wp === 'undefined' )
 				allowed: [ 'name', 'author', 'date', 'title', 'modified', 'parent', 'ID' ],
 				keymap:  {
 					'ID':     'id',
-					'name':   'slug',
 					'parent': 'uploadedTo'
 				}
 			};
@@ -312,7 +311,7 @@ if ( typeof wp === 'undefined' )
 				// Note that this client-side searching is *not* equivalent
 				// to our server-side searching.
 				this.filters.search = function( attachment ) {
-					return _.any(['title','filename','description','caption','slug'], function( key ) {
+					return _.any(['title','filename','description','caption','name'], function( key ) {
 						var value = attachment.get( key );
 						return value && -1 !== value.search( this.args.s );
 					}, this );
