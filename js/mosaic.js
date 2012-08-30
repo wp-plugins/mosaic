@@ -512,12 +512,14 @@ if ( typeof wp === 'undefined' )
 
 		open: function( event ) {
 			this.$el.show();
-			event.preventDefault();
+			if ( event )
+				event.preventDefault();
 		},
 
 		close: function( event ) {
 			this.$el.hide();
-			event.preventDefault();
+			if ( event )
+				event.preventDefault();
 		},
 
 		content: function( $content ) {
@@ -829,7 +831,11 @@ if ( typeof wp === 'undefined' )
 		$('#wp-content-media-buttons').prepend( trigger );
 
 		trigger.on( 'click.mosaic', function() {
-			new media.controller.Workflow().render();
+			var workflow = new media.controller.Workflow().render();
+
+			workflow.selection.on( 'add', function( model ) {
+				workflow.modal.close();
+			});
 		});
 	});
 }(jQuery));
