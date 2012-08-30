@@ -165,6 +165,14 @@
 	border: 1px solid #dfdfdf;
 }
 
+.attachment:hover {
+	border-color: #d54e21;
+}
+
+.attachment.selected {
+	border-color: #21759b;
+}
+
 .attachment-thumbnail {
 	position: absolute;
 	top: 0;

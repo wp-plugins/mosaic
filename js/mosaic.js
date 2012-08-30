@@ -2,7 +2,7 @@ if ( typeof wp === 'undefined' )
 	var wp = {};
 
 (function($){
-	var media = wp.media = { view: {} },
+	var media = wp.media = { view: {}, controller: {} },
 		view  = media.view,
 		Attachment, Attachments;
 
@@ -138,10 +138,6 @@ if ( typeof wp === 'undefined' )
 	/**
 	 * wp.media.Attachments
 	 */
-	media.query = function( query, options ) {
-		return new Attachments( null, { query: query }).fetch();
-	};
-
 	Attachments = media.Attachments = Backbone.Collection.extend({
 		model: Attachment,
 
@@ -150,32 +146,8 @@ if ( typeof wp === 'undefined' )
 
 			this.filters = options.filters || {};
 
-			if ( options.query || _.isUndefined( options.query ) ) {
-				this.query = new Backbone.Model( _.defaults( options.query || {}, Attachments.defaultQueryArgs ) );
-
-				this.query.on( 'change', function() {
-					this.hasMore = true;
-				}, this );
-				this.hasMore = true;
-			}
-
 			if ( options.watch )
-				this.watch();
-		},
-
-		more: function( options ) {
-			var collection = this;
-
-			if ( ! this.hasMore || ! this.query )
-				return;
-
-			options = options || {};
-			options.add = true;
-
-			return this.fetch( options ).done( function( resp ) {
-				if ( _.isEmpty( resp ) || resp.length < this.query.get( 'posts_per_page' ) )
-					collection.hasMore = false;
-			});
+				this.watch( options.watch );
 		},
 
 		validate: function( attachment ) {
@@ -192,28 +164,27 @@ if ( typeof wp === 'undefined' )
 			return this;
 		},
 
-		watch: function() {
-			if ( this.watching )
+		watch: function( attachments ) {
+			if ( this.watching && this.watching === attachments )
 				return;
 
-			this.watching = true;
-			Attachments.all.on( 'add change', this.changed, this );
+			this.unwatch();
+			this.watching = attachments;
+			this.reset( attachments.models );
+			this.watching.on( 'add change', this.changed, this );
 		},
 
 		unwatch: function() {
-			this.watching = false;
-			Attachments.all.off( 'add change', this.changed, this );
+			if ( ! this.watching )
+				return;
+
+			this.watching.off( 'add change', this.changed, this );
+			delete this.watching;
 		},
 
-		clone: function() {
-			var clone = new this.constructor( this.models, {
-				comparator: this.comparator,
-				query:      this.query.toJSON(),
-				filters:    this.filters,
-				watch:      this.watching
-			});
-			clone.hasMore = this.hasMore;
-			return clone;
+		more: function( options ) {
+			if ( this.watching && this.watching.more )
+				return this.watching.more( options );
 		},
 
 		parse: function( resp, xhr ) {
@@ -221,10 +192,126 @@ if ( typeof wp === 'undefined' )
 				var attachment = Attachment.get( attrs.id );
 				return attachment.set( attachment.parse( attrs, xhr ) );
 			});
+		}
+	});
+
+	Attachments.all = new Attachments();
+
+	/**
+	 * wp.media.query
+	 */
+	media.query = (function(){
+		var queries = [];
+
+		return function( args, options ) {
+			args = _.defaults( args || {}, media.Query.defaultArgs );
+
+			var query = _.find( queries, function( query ) {
+				return _.isEqual( query.args, args );
+			});
+
+			if ( ! query ) {
+				query = new media.Query( [], _.extend( options || {}, { args: args } ) );
+				queries.push( query );
+			}
+
+			return query;
+		};
+	}());
+
+	/**
+	 * wp.media.Query
+	 *
+	 * A set of attachments that corresponds to a set of consecutively paged
+	 * queries on the server.
+	 *
+	 * Note: Do NOT change this.args after the query has been initialized.
+	 *       Things will break.
+	 */
+	media.Query = Attachments.extend({
+		initialize: function( models, options ) {
+			var orderby,
+				defaultArgs = media.Query.defaultArgs;
+
+			options = options || {};
+			Attachments.prototype.initialize.apply( this, arguments );
+
+			// Generate this.args. Don't mess with them.
+			this.args = _.defaults( options.args || {}, defaultArgs );
+
+			// Normalize the order.
+			this.args.order = this.args.order.toUpperCase();
+			if ( 'DESC' !== this.args.order && 'ASC' !== this.args.order )
+				this.args.order = defaultArgs.order.toUpperCase();
+
+			// Set allowed orderby values.
+			// These map directly to attachment keys in most scenarios.
+			// Exceptions are specified in orderby.keymap.
+			orderby = {
+				allowed: [ 'name', 'author', 'date', 'title', 'modified', 'parent', 'ID' ],
+				keymap:  {
+					'ID':     'id',
+					'name':   'slug',
+					'parent': 'uploadedTo'
+				}
+			};
+
+			if ( ! _.contains( orderby.allowed, this.args.orderby ) )
+				this.args.orderby = defaultArgs.orderby;
+			this.orderkey = orderby.keymap[ this.args.orderby ] || this.args.orderby;
+
+			this.hasMore = true;
+			this.created = new Date();
+
+			this.filters.order = function( attachment ) {
+				// We want any items that can be placed before the last
+				// item in the set. If we add any items after the last
+				// item, then we can't guarantee the set is complete.
+				if ( this.length ) {
+					return 1 !== this.comparator( attachment, this.last() );
+
+				// Handle the case where there are no items yet and
+				// we're sorting for recent items. In that case, we want
+				// changes that occurred after we created the query.
+				} else if ( 'DESC' === this.args.order && ( 'date' === this.orderkey || 'modified' === this.orderkey ) ) {
+					return attachment.get( this.orderkey ) >= this.created;
+				}
+
+				// Otherwise, we don't want any items yet.
+				return false;
+			};
+
+			if ( this.args.s ) {
+				// Note that this client-side searching is *not* equivalent
+				// to our server-side searching.
+				this.filters.search = function( attachment ) {
+					return _.any(['title','filename','description','caption','slug'], function( key ) {
+						var value = attachment.get( key );
+						return value && -1 !== value.search( this.args.s );
+					}, this );
+				};
+			}
+
+			this.watch( Attachments.all );
+		},
+
+		more: function( options ) {
+			var query = this;
+
+			if ( ! this.hasMore )
+				return;
+
+			options = options || {};
+			options.add = true;
+
+			return this.fetch( options ).done( function( resp ) {
+				if ( _.isEmpty( resp ) || resp.length < this.args.posts_per_page )
+					query.hasMore = false;
+			});
 		},
 
 		sync: function( method, model, options ) {
-			var query;
+			var fallback;
 
 			// Overload the read method so Attachment.fetch() functions correctly.
 			if ( 'read' === method ) {
@@ -234,30 +321,104 @@ if ( typeof wp === 'undefined' )
 					action: 'get_attachments'
 				});
 
-				if ( this.query ) {
-					query = this.query.toJSON();
+				// Clone the args so manipulation is non-destructive.
+				args = _.clone( this.args );
 
-					// Determine which page to query.
-					if ( _.isUndefined( query.paged ) )
-						query.paged = Math.floor( this.length / query.posts_per_page ) + 1;
+				// Determine which page to query.
+				args.paged = Math.floor( this.length / args.posts_per_page ) + 1;
 
-					options.data.query = query;
-				}
-
+				options.data.query = args;
 				return media.ajax( options );
 
 			// Otherwise, fall back to Backbone.sync()
 			} else {
-				return Backbone.sync.apply( this, arguments );
+				fallback = Attachments.prototype.sync ? Attachments.prototype : Backbone;
+				return fallback.sync.apply( this, arguments );
 			}
-		}
+		},
+
+		comparator: (function(){
+			/**
+			 * A basic comparator.
+			 *
+			 * @param  {mixed}  a  The primary parameter to compare.
+			 * @param  {mixed}  b  The primary parameter to compare.
+			 * @param  {string} ac The fallback parameter to compare, a's cid.
+			 * @param  {string} bc The fallback parameter to compare, b's cid.
+			 * @return {number}    -1: a should come before b.
+			 *                      0: a and b are of the same rank.
+			 *                      1: b should come before a.
+			 */
+			var compare = function( a, b, ac, bc ) {
+				if ( _.isEqual( a, b ) )
+					return ac === bc ? 0 : (ac > bc ? -1 : 1);
+				else
+					return a > b ? -1 : 1;
+			};
+
+			return function( a, b ) {
+				var key   = this.orderkey,
+					order = this.args.order,
+					ac    = a.cid,
+					bc    = b.cid;
+
+				a = a.get( key );
+				b = b.get( key );
+
+				if ( 'date' === key || 'modified' === key ) {
+					a = a || new Date();
+					b = b || new Date();
+				}
+
+				return ( 'DESC' === order ) ? compare( a, b, ac, bc ) : compare( b, a, bc, ac );
+			};
+		}())
 	}, {
-		defaultQueryArgs: {
-			posts_per_page: 40
+		defaultArgs: {
+			posts_per_page: 40,
+			orderby:       'date',
+			order:         'DESC'
 		}
 	});
 
-	Attachments.all = new Attachments();
+	/**
+	 * ========================================================================
+	 * CONTROLLERS
+	 * ========================================================================
+	 */
+	media.controller.Workflow = Backbone.Model.extend({
+		defaults: {
+			multiple: true
+		},
+
+		initialize: function() {
+			this.selection = new Attachments();
+
+			views.workspace.$content.append( views.attachments.$el );
+			views.workspace.render();
+			views.attachments.render();
+			views.modal.content( views.workspace );
+			views.modal.$el.appendTo('body');
+
+			models.library.fetch();
+		},
+
+		initViews: function() {
+			this.modal     = new view.Modal();
+			this.workspace = new view.Workspace();
+		},
+
+		select: function( attachment ) {
+			if ( this.get('multiple') )
+				this.selection.add( attachment );
+			else
+				this.selection.reset( attachment );
+		},
+
+		deselect: function( attachment ) {
+			this.selection.remove( attachment );
+		}
+	});
 
 	/**
 	 * ========================================================================
@@ -274,6 +435,12 @@ if ( typeof wp === 'undefined' )
 
 		events: {
 			'click .media-modal-backdrop, .media-modal-close' : 'close'
+		},
+
+		initialize: function() {
+			_.defaults( this.options, {
+				title: ''
+			});
 		},
 
 		render: function() {
@@ -324,6 +491,9 @@ if ( typeof wp === 'undefined' )
 
 			this.$content = $('<div class="existing-attachments" />');
 
+			// Track selection.
+			this.selection = new Attachments();
+
 			// Track uploading attachments.
 			this.pending = new Attachments( [], { query: false });
 			this.pending.on( 'add remove reset change:percent', function() {
@@ -360,6 +530,7 @@ if ( typeof wp === 'undefined' )
 				container: this.$el,
 				dropzone:  this.$el,
 				browser:   this.$('.upload-attachments a'),
+
 				added: function( file ) {
 					file.attachment = Attachment.create( _.extend({
 						file: file,
@@ -369,9 +540,11 @@ if ( typeof wp === 'undefined' )
 
 					workspace.pending.add( file.attachment );
 				},
+
 				progress: function( file ) {
 					file.attachment.set( _.pick( file, 'loaded', 'percent' ) );
 				},
+
 				success: function( resp, file ) {
 					var complete;
 
@@ -389,6 +562,7 @@ if ( typeof wp === 'undefined' )
 					if ( complete )
 						workspace.pending.reset();
 				},
+
 				error: function( message, error, file ) {
 					file.attachment.destroy();
 				}
@@ -475,25 +649,18 @@ if ( typeof wp === 'undefined' )
 		},
 
 		search: function( event ) {
-			var collection = this.collection;
+			var args = _.clone( this.collection.watching.args );
 
-			if ( collection.searching === event.target.value )
+			// Bail if we're currently searching for the same string.
+			if ( args.s === event.target.value )
 				return;
 
-			collection.searching = event.target.value;
+			if ( event.target.value )
+				args.s = event.target.value;
+			else
+				delete args.s;
 
-			if ( collection.searching ) {
-				if ( ! collection.library )
-					collection.library = collection.clone();
-
-				collection.query.set( 's', collection.searching );
-				collection.reset( _.filter( collection.library.models, collection.validate, collection ) );
-
-			} else {
-				collection.query.unset('s');
-				collection.reset( collection.library.models );
-				delete collection.library;
-			}
+			this.collection.watch( media.query( args ) );
 		}
 	});
 
@@ -514,12 +681,14 @@ if ( typeof wp === 'undefined' )
 		render: function() {
 			var attachment = this.model.toJSON(),
 				options = {
-					orientation: 'landscape',
-					thumbnail:   '',
+					orientation: attachment.orientation || 'landscape',
+					thumbnail:   attachment.url || '',
 					uploading:   attachment.uploading
 				};
 
-			if ( attachment.sizes ) {
+			if ( attachment.sizes && attachment.sizes.medium ) {
+				// Use the medium size if possible. If the medium size doesn't exist,
+				// then the attachment is too small. In that case, use the attachment itself.
 				options.orientation = attachment.sizes.medium.orientation;
 				options.thumbnail   = attachment.sizes.medium.url;
 			}
@@ -551,42 +720,8 @@ if ( typeof wp === 'undefined' )
 
 		trigger.on( 'click.mosaic', function() {
 			var library = models.library = new Attachments( [], {
-				comparator: function( a, b ) {
-					a = a.get('date') || new Date();
-					b = b.get('date') || new Date();
-					return a == b ? 0 : (a > b ? -1 : 1);
-				},
-
-				filters: {
-					date: (function( created ) {
-						return function( attachment ) {
-							var date;
-
-							if ( this.library && this.library.length )
-								date = this.library.last().get('date');
-							else if ( this.length )
-								date = this.last().get('date');
-
-							date = date || created;
-							return attachment.get('date') >= date;
-						};
-					}( new Date() )),
-
-					search: function( attachment ) {
-						if ( ! this.searching )
-							return true;
-
-						return _.any(['title','filename','description','caption','slug'], function( key ) {
-							var value = attachment.get( key );
-							return value && -1 !== value.search( this.searching );
-						}, this );
-					}
-				},
-
-				watch: true
+				watch: media.query()
 			});
-
-			models.selected = new Attachments();
 
 			views.modal = new view.Modal({
 				title: 'Testing'
@@ -607,7 +742,7 @@ if ( typeof wp === 'undefined' )
 			views.modal.content( views.workspace );
 			views.modal.$el.appendTo('body');
 
-			models.library.fetch();
+			models.library.more();
 		});
 	});
 }(jQuery));
