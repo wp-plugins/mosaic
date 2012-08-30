@@ -822,11 +822,7 @@ if ( typeof wp === 'undefined' )
 	});
 
 	$(function() {
-		var trigger = $('<span class="button-secondary">Mosaic</span>'),
-			models = {}, views = {};
-
-		window.models = models;
-		window.views = views;
+		var trigger = $('<span class="button-secondary">Mosaic</span>');
 
 		$('#wp-content-media-buttons').prepend( trigger );
 
