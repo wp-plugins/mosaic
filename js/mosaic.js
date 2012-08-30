@@ -548,7 +548,7 @@ if ( typeof wp === 'undefined' )
 			this.attachmentsView = new view.Attachments({
 				controller: this.controller,
 				directions: 'Select stuff.',
-				collection: new Attachments( [], {
+				collection: new Attachments( null, {
 					mirror: media.query()
 				})
 			}).render();
