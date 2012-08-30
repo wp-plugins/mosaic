@@ -420,7 +420,7 @@ if ( typeof wp === 'undefined' )
 	 */
 	media.controller.Workflow = Backbone.Model.extend({
 		defaults: {
-			multiple: true
+			multiple: false
 		},
 
 		initialize: function() {
@@ -441,19 +441,24 @@ if ( typeof wp === 'undefined' )
 			// If the workflow does not support multiple
 			// selected attachments, reset the selection.
 			this.selection.add = function( models, options ) {
-				if ( controller.get('multiple') ) {
-					return Attachments.prototype.add.apply( this, arguments );
-				} else {
+				if ( ! controller.get('multiple') ) {
 					models = _.isArray( models ) ? _.first( models ) : models;
-					return this.reset.call( this, [models], options );
+					this.clear( options );
 				}
+
+				return Attachments.prototype.add.apply( this, arguments );
+			};
+
+			// Create selection.clear. Removes all models from the selection.
+			this.selection.clear = function( options ) {
+				return this.remove( this.models, options );
 			};
 
 			// Override the selection's reset method.
 			// Always direct items through add and remove,
 			// as we need them to fire.
 			this.selection.reset = function( models, options ) {
-				return this.remove( models, options ).add( models, options );
+				return this.clear( options ).add( models, options );
 			};
 
 			// Create selection.has, which determines if a model
