@@ -633,15 +633,17 @@ if ( typeof wp === 'undefined' )
 		},
 
 		render: function() {
-			this.$el.html( this.template( this.options ) );
+			this.$el.html( this.template( this.options ) ).append( this.$list );
 			this.refresh();
 			return this;
 		},
 
 		refresh: function() {
-			this.$list.detach().empty();
-			this.collection.each( this.add, this );
-			this.$el.append( this.$list );
+			this.$list.html( this.collection.map( function( attachment ) {
+				return new media.view.Attachment({
+					model: attachment
+				}).render().$el;
+			}) );
 			this.scroll();
 			return this;
 		},
