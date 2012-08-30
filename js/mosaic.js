@@ -446,7 +446,7 @@ if ( typeof wp === 'undefined' )
 						this.clear( options );
 					}
 
-					return Attachments.prototype.add.apply( this, arguments );
+					return Attachments.prototype.add.call( this, models, options );
 				},
 
 				// Removes all models from the selection.
@@ -472,8 +472,7 @@ if ( typeof wp === 'undefined' )
 
 		render: function() {
 			this.workspace.render();
-			this.modal.content( this.workspace );
-			this.modal.$el.appendTo('body');
+			this.modal.content( this.workspace ).attach();
 			return this;
 		}
 	});
@@ -492,14 +491,15 @@ if ( typeof wp === 'undefined' )
 		template: media.template('media-modal'),
 
 		events: {
-			'click .media-modal-backdrop, .media-modal-close' : 'close'
+			'click .media-modal-backdrop, .media-modal-close' : 'closeHandler'
 		},
 
 		initialize: function() {
 			this.controller = this.options.controller;
 
 			_.defaults( this.options, {
-				title: ''
+				title: '',
+				container: document.body
 			});
 		},
 
@@ -509,16 +509,25 @@ if ( typeof wp === 'undefined' )
 			return this;
 		},
 
-		open: function( event ) {
-			this.$el.show();
-			if ( event )
-				event.preventDefault();
+		attach: function() {
+			this.$el.appendTo( this.options.container );
 		},
 
-		close: function( event ) {
+		detach: function() {
+			this.$el.detach();
+		},
+
+		open: function() {
+			this.$el.show();
+		},
+
+		close: function() {
 			this.$el.hide();
-			if ( event )
-				event.preventDefault();
+		},
+
+		closeHandler: function( event ) {
+			event.preventDefault();
+			this.close();
 		},
 
 		content: function( $content ) {
@@ -559,7 +568,7 @@ if ( typeof wp === 'undefined' )
 				collection: new Attachments( null, {
 					mirror: media.query()
 				})
-			}).render();
+			});
 
 			this.$content = $('<div class="existing-attachments" />');
 			this.$content.append( this.attachmentsView.$el );
@@ -582,6 +591,7 @@ if ( typeof wp === 'undefined' )
 		},
 
 		render: function() {
+			this.attachmentsView.render();
 			this.$el.html( this.template( this.options ) ).append( this.$content );
 			this.$bar = this.$('.media-progress-bar div');
 			return this;
@@ -821,16 +831,21 @@ if ( typeof wp === 'undefined' )
 	});
 
 	$(function() {
-		var trigger = $('<span class="button-secondary">Mosaic</span>');
+		var trigger = $('<span class="button-secondary">Mosaic</span>'),
+			workflow;
 
 		$('#wp-content-media-buttons').prepend( trigger );
 
 		trigger.on( 'click.mosaic', function() {
-			var workflow = new media.controller.Workflow().render();
+			if ( ! workflow ) {
+				workflow = new media.controller.Workflow().render();
+				workflow.selection.on( 'add', function( model ) {
+					workflow.modal.close();
+					workflow.selection.clear();
+				});
+			}
 
-			workflow.selection.on( 'add', function( model ) {
-				workflow.modal.close();
-			});
+			workflow.modal.open();
 		});
 	});
 }(jQuery));
