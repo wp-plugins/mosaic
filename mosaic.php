@@ -41,7 +41,7 @@ class Mosaic {
 	 *
 	 * @param  mixed $json The object to be encoded and printed.
 	 */
-	function wp_json_die( $json ) {
+	function wp_send_json( $json ) {
 		@header( 'Content-Type: application/json; charset=' . get_option( 'blog_charset' ) );
 		echo json_encode( $json );
 
@@ -51,41 +51,41 @@ class Mosaic {
 			die;
 	}
 
-	function wp_die_success( $data = null ) {
+	function wp_send_json_success( $data = null ) {
 		$json = array( 'success' => true );
 
 		if ( isset( $data ) )
 			$json['data'] = $data;
 
-		$this->wp_json_die( $json );
+		$this->wp_send_json( $json );
 	}
 
-	function wp_die_error( $data = null ) {
+	function wp_send_json_error( $data = null ) {
 		$json =  array( 'success' => false );
 
 		if ( isset( $data ) )
 			$json['data'] = $data;
 
-		$this->wp_json_die( $json );
+		$this->wp_send_json( $json );
 	}
 
 	function ajax_get_attachment() {
 		if ( ! isset( $_REQUEST['id'] ) )
-			$this->wp_die_error();
+			$this->wp_send_json_error();
 
 		$json = $this->get_attachment_json( absint( $_REQUEST['id'] ) );
 
 		if ( empty( $json ) )
-			$this->wp_die_error();
+			$this->wp_send_json_error();
 
-		$this->wp_die_success( $json );
+		$this->wp_send_json_success( $json );
 	}
 
 	function ajax_get_attachments() {
 		$query = isset( $_REQUEST['query'] ) ? $_REQUEST['query'] : array();
 		$json  = $this->get_attachments_json( $query );
 
-		$this->wp_die_success( $json );
+		$this->wp_send_json_success( $json );
 	}
 
 	function get_attachment_json( $attachment ) {

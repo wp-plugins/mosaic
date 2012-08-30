@@ -77,7 +77,7 @@ if ( typeof wp === 'undefined' )
 				delete options.success;
 				delete options.error;
 
-				// Use with PHP's wp_die_success() and wp_die_error()
+				// Use with PHP's wp_send_json_success() and wp_send_json_error()
 				$.ajax( options ).done( function( response ) {
 					if ( _.isObject( response ) && ! _.isUndefined( response.success ) )
 						deferred[ response.success ? 'resolveWith' : 'rejectWith' ]( this, [response.data] );
