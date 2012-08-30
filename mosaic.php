@@ -61,7 +61,7 @@ class Mosaic {
 	}
 
 	function wp_send_json_error( $data = null ) {
-		$json =  array( 'success' => false );
+		$json = array( 'success' => false );
 
 		if ( isset( $data ) )
 			$json['data'] = $data;
