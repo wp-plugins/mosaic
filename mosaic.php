@@ -44,7 +44,11 @@ class Mosaic {
 	function wp_json_die( $json ) {
 		@header( 'Content-Type: application/json; charset=' . get_option( 'blog_charset' ) );
 		echo json_encode( $json );
-		wp_die();
+
+		if ( defined( 'DOING_AJAX' ) && DOING_AJAX )
+			wp_die();
+		else
+			die;
 	}
 
 	function wp_die_success( $data = null ) {
