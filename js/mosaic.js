@@ -2,9 +2,8 @@ if ( typeof wp === 'undefined' )
 	var wp = {};
 
 (function($){
-	var media = wp.media = { view: {}, controller: {} },
-		view  = media.view,
-		Attachment, Attachments;
+	var media = wp.media = { model: {}, view: {}, controller: {} },
+		Attachment, Attachments, Query;
 
 	/**
 	 * ========================================================================
@@ -99,9 +98,9 @@ if ( typeof wp === 'undefined' )
 	 */
 
 	/**
-	 * wp.media.Attachment
+	 * wp.media.model.Attachment
 	 */
-	Attachment = media.Attachment = Backbone.Model.extend({
+	Attachment = media.model.Attachment = Backbone.Model.extend({
 		sync: function( method, model, options ) {
 			// Overload the read method so Attachment.fetch() functions correctly.
 			if ( 'read' === method ) {
@@ -136,9 +135,9 @@ if ( typeof wp === 'undefined' )
 	});
 
 	/**
-	 * wp.media.Attachments
+	 * wp.media.model.Attachments
 	 */
-	Attachments = media.Attachments = Backbone.Collection.extend({
+	Attachments = media.model.Attachments = Backbone.Collection.extend({
 		model: Attachment,
 
 		initialize: function( models, options ) {
@@ -232,14 +231,14 @@ if ( typeof wp === 'undefined' )
 		var queries = [];
 
 		return function( args, options ) {
-			args = _.defaults( args || {}, media.Query.defaultArgs );
+			args = _.defaults( args || {}, Query.defaultArgs );
 
 			var query = _.find( queries, function( query ) {
 				return _.isEqual( query.args, args );
 			});
 
 			if ( ! query ) {
-				query = new media.Query( [], _.extend( options || {}, { args: args } ) );
+				query = new Query( [], _.extend( options || {}, { args: args } ) );
 				queries.push( query );
 			}
 
@@ -248,7 +247,7 @@ if ( typeof wp === 'undefined' )
 	}());
 
 	/**
-	 * wp.media.Query
+	 * wp.media.model.Query
 	 *
 	 * A set of attachments that corresponds to a set of consecutively paged
 	 * queries on the server.
@@ -256,10 +255,10 @@ if ( typeof wp === 'undefined' )
 	 * Note: Do NOT change this.args after the query has been initialized.
 	 *       Things will break.
 	 */
-	media.Query = Attachments.extend({
+	Query = media.model.Query = Attachments.extend({
 		initialize: function( models, options ) {
 			var orderby,
-				defaultArgs = media.Query.defaultArgs;
+				defaultArgs = Query.defaultArgs;
 
 			options = options || {};
 			Attachments.prototype.initialize.apply( this, arguments );
@@ -427,8 +426,8 @@ if ( typeof wp === 'undefined' )
 			this.createSelection();
 
 			// Initialize views.
-			this.modal     = new view.Modal({ controller: this });
-			this.workspace = new view.Workspace({ controller: this });
+			this.modal     = new media.view.Modal({ controller: this });
+			this.workspace = new media.view.Workspace({ controller: this });
 		},
 
 		createSelection: function() {
@@ -488,7 +487,7 @@ if ( typeof wp === 'undefined' )
 	/**
 	 * wp.media.view.Modal
 	 */
-	view.Modal = Backbone.View.extend({
+	media.view.Modal = Backbone.View.extend({
 		tagName:  'div',
 		template: media.template('media-modal'),
 
@@ -536,7 +535,7 @@ if ( typeof wp === 'undefined' )
 	/**
 	 * wp.media.view.Workspace
 	 */
-	view.Workspace = Backbone.View.extend({
+	media.view.Workspace = Backbone.View.extend({
 		tagName:   'div',
 		className: 'media-workspace',
 		template:  media.template('media-workspace'),
@@ -554,7 +553,7 @@ if ( typeof wp === 'undefined' )
 				uploader:  {}
 			});
 
-			this.attachmentsView = new view.Attachments({
+			this.attachmentsView = new media.view.Attachments({
 				controller: this.controller,
 				directions: 'Select stuff.',
 				collection: new Attachments( null, {
@@ -643,7 +642,7 @@ if ( typeof wp === 'undefined' )
 	/**
 	 * wp.media.view.Attachments
 	 */
-	view.Attachments = Backbone.View.extend({
+	media.view.Attachments = Backbone.View.extend({
 		tagName:   'div',
 		className: 'attachments',
 		template:  media.template('attachments'),
@@ -696,7 +695,7 @@ if ( typeof wp === 'undefined' )
 					controller: this.controller,
 					model:      attachment
 				}).render().$el;
-			}) );
+			}, this ) );
 
 			// Then, trigger the scroll event to check if we're within the
 			// threshold to query for additional attachments.
@@ -756,7 +755,7 @@ if ( typeof wp === 'undefined' )
 	/**
 	 * wp.media.view.Attachment
 	 */
-	view.Attachment = Backbone.View.extend({
+	media.view.Attachment = Backbone.View.extend({
 		tagName:   'li',
 		className: 'attachment',
 		template:  media.template('attachment'),
