@@ -148,6 +148,9 @@ if ( typeof wp === 'undefined' )
 
 			if ( options.watch )
 				this.watch( options.watch );
+
+			if ( options.mirror )
+				this.mirror( options.mirror );
 		},
 
 		validate: function( attachment ) {
@@ -156,7 +159,8 @@ if ( typeof wp === 'undefined' )
 			}, this );
 		},
 
-		changed: function( attachment ) {
+		changed: function( attachment, options ) {
+
 			if ( this.validate( attachment ) )
 				this.add( attachment );
 			else
@@ -165,26 +169,50 @@ if ( typeof wp === 'undefined' )
 		},
 
 		watch: function( attachments ) {
-			if ( this.watching && this.watching === attachments )
-				return;
-
-			this.unwatch();
-			this.watching = attachments;
-			this.reset( attachments.models );
-			this.watching.on( 'add change', this.changed, this );
+			attachments.on( 'add change', this.changed, this );
 		},
 
-		unwatch: function() {
-			if ( ! this.watching )
+		unwatch: function( attachments ) {
+			attachments.off( 'add change', this.changed, this );
+		},
+
+		mirror: function( attachments ) {
+			if ( this.mirroring && this.mirroring === attachments )
 				return;
 
-			this.watching.off( 'add change', this.changed, this );
-			delete this.watching;
+			this.unmirror();
+			this.mirroring = attachments;
+			this.reset( attachments.models );
+			attachments.on( 'add',    this._mirrorAdd,    this );
+			attachments.on( 'remove', this._mirrorRemove, this );
+			attachments.on( 'reset',  this._mirrorReset,  this );
+		},
+
+		unmirror: function() {
+			if ( ! this.mirroring )
+				return;
+
+			this.mirroring.off( 'add',    this._mirrorAdd,    this );
+			this.mirroring.off( 'remove', this._mirrorRemove, this );
+			this.mirroring.off( 'reset',  this._mirrorReset,  this );
+			delete this.mirroring;
+		},
+
+		_mirrorAdd: function( attachment, attachments, options ) {
+			this.add( attachment, { at: options.index });
+		},
+
+		_mirrorRemove: function( attachment ) {
+			this.remove( attachment );
+		},
+
+		_mirrorReset: function( attachments ) {
+			this.reset( attachments.models );
 		},
 
 		more: function( options ) {
-			if ( this.watching && this.watching.more )
-				return this.watching.more( options );
+			if ( this.mirroring && this.mirroring.more )
+				return this.mirroring.more( options );
 		},
 
 		parse: function( resp, xhr ) {
@@ -649,7 +677,7 @@ if ( typeof wp === 'undefined' )
 		},
 
 		search: function( event ) {
-			var args = _.clone( this.collection.watching.args );
+			var args = _.clone( this.collection.mirroring.args );
 
 			// Bail if we're currently searching for the same string.
 			if ( args.s === event.target.value )
@@ -660,7 +688,7 @@ if ( typeof wp === 'undefined' )
 			else
 				delete args.s;
 
-			this.collection.watch( media.query( args ) );
+			this.collection.mirror( media.query( args ) );
 		}
 	});
 
@@ -720,7 +748,7 @@ if ( typeof wp === 'undefined' )
 
 		trigger.on( 'click.mosaic', function() {
 			var library = models.library = new Attachments( [], {
-				watch: media.query()
+				mirror: media.query()
 			});
 
 			views.modal = new view.Modal({
